@@ -34,10 +34,7 @@ toggle.addEventListener('change', () => {
   // content.js listens via chrome.storage.onChanged — no direct message needed.
 });
 
-console.log('[Claude Deep Think popup] script loaded, save handler attached');
-
 saveBtn.addEventListener('click', () => {
-  console.log('[Claude Deep Think popup] save clicked');
   const value = textarea.value.trim();
   if (!value) {
     flash('Cannot save empty instruction', true);
