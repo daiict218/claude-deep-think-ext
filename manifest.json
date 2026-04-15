@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Claude Deep Think",
-  "version": "1.0",
-  "description": "Appends a reasoning instruction to every message sent to Claude",
+  "version": "1.0.0",
+  "description": "Customize and toggle a reasoning instruction that is automatically appended to every message you send on claude.ai. Zero telemetry.",
   "permissions": ["storage"],
+  "host_permissions": ["https://claude.ai/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
+      "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
     }
@@ -25,6 +27,7 @@
     }
   ],
   "icons": {
+    "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
   }

@@ -8,5 +8,8 @@ node_modules/
 *.swp
 *.swo
 
+# Build output
+dist/
+
 # Claude Code local overrides
 .claude/settings.local.json

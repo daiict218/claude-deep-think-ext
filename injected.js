@@ -187,10 +187,7 @@
     const { enabled, instruction } = getState();
     if (!enabled) return false;
     const editor = findEditor();
-    if (!editor) {
-      console.log('[Claude Deep Think] editor not found');
-      return false;
-    }
+    if (!editor) return false;
     const currentText = editor.innerText || '';
     if (!currentText.trim()) return false;
     if (currentText.includes(instruction.trim())) return false;
@@ -212,7 +209,6 @@
         cancelable: true,
       }));
     }
-    console.log('[Claude Deep Think] appended to editor:', instruction.slice(0, 50) + '...');
     return true;
   };
 
@@ -276,5 +272,4 @@
     return originalFetch.apply(this, [resource, config]);
   };
 
-  console.log('[Claude Deep Think] active. Reading state from DOM on every send.');
 })();
