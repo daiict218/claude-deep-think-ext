@@ -2,15 +2,21 @@
   const DEFAULT_INSTRUCTION = `Always reason thoroughly and deeply. Treat every request as complex unless I explicitly say otherwise. Never optimize for brevity at the expense of quality. Think step-by-step, consider tradeoffs, and provide comprehensive analysis.`;
   const SEPARATOR = '\n\n---\n\n';
 
-  // Per-message override. Defaults to ON and auto-resets after every send.
-  let perMessageEnabled = true;
+  // Single source of truth: document.documentElement.dataset.claudeDtEnabled,
+  // persisted to chrome.storage.local by content.js. Popup toggle and chip
+  // both read/write this same flag, so they are always in sync.
+  const isEnabled = () =>
+    document.documentElement.dataset.claudeDtEnabled !== '0';
 
-  // Always read fresh state from the DOM — no caching, no race conditions.
+  const setEnabled = (value) => {
+    document.documentElement.dataset.claudeDtEnabled = value ? '1' : '0';
+    window.postMessage({ type: 'CLAUDE_DT_TOGGLE', enabled: value }, '*');
+  };
+
   const getState = () => {
     const root = document.documentElement;
-    const globallyEnabled = root.dataset.claudeDtEnabled !== '0';
     const instruction = root.dataset.claudeDtInstruction || DEFAULT_INSTRUCTION;
-    return { enabled: globallyEnabled && perMessageEnabled, instruction };
+    return { enabled: isEnabled(), instruction };
   };
 
   // ---------- Floating chip UI ----------
@@ -21,8 +27,8 @@
     style.textContent = `
       #claude-dt-chip {
         position: fixed; z-index: 2147483647;
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 6px 12px; margin: 0;
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 7px 12px 7px 12px; margin: 0;
         background: #1a1a2e; color: #e0e0e0;
         border: 1px solid #2a2a3e;
         border-left: 2px solid #4ade80;
@@ -39,48 +45,66 @@
       #claude-dt-chip .claude-dt-dot {
         width: 7px; height: 7px; border-radius: 50%;
         background: #4ade80;
+        transition: background .15s ease;
       }
       #claude-dt-chip .claude-dt-state {
         color: #4ade80; font-weight: 600; letter-spacing: .3px;
+        min-width: 22px; text-align: right;
+        transition: color .15s ease;
       }
-      #claude-dt-chip.off { border-left-color: #e94560; opacity: .8; }
+      #claude-dt-chip .claude-dt-switch {
+        position: relative;
+        width: 26px; height: 14px;
+        border-radius: 7px;
+        background: #1a3a2a;
+        transition: background .15s ease;
+        flex-shrink: 0;
+      }
+      #claude-dt-chip .claude-dt-switch::after {
+        content: '';
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: #4ade80;
+        transform: translateX(12px);
+        transition: transform .18s ease, background .15s ease;
+      }
+      #claude-dt-chip.off { border-left-color: #e94560; opacity: .85; }
       #claude-dt-chip.off .claude-dt-dot { background: #e94560; }
       #claude-dt-chip.off .claude-dt-state { color: #e94560; }
+      #claude-dt-chip.off .claude-dt-switch { background: #3a1f26; }
+      #claude-dt-chip.off .claude-dt-switch::after {
+        transform: translateX(0);
+        background: #e94560;
+      }
     `;
     (document.head || document.documentElement).appendChild(style);
   };
 
   const updateChipVisual = (chip) => {
-    chip.classList.toggle('off', !perMessageEnabled);
-    chip.setAttribute('aria-checked', perMessageEnabled ? 'true' : 'false');
-    chip.querySelector('.claude-dt-state').textContent = perMessageEnabled ? 'ON' : 'OFF';
-    chip.title = perMessageEnabled
-      ? 'Deep Think is ON for this message (click or Cmd/Ctrl+Shift+D to skip)'
-      : 'Deep Think is OFF for this message (click or Cmd/Ctrl+Shift+D to re-enable)';
+    const on = isEnabled();
+    chip.classList.toggle('off', !on);
+    chip.setAttribute('aria-checked', on ? 'true' : 'false');
+    chip.querySelector('.claude-dt-state').textContent = on ? 'ON' : 'OFF';
+    chip.title = on
+      ? 'Deep Think is ON (click or Cmd/Ctrl+Shift+D to turn off)'
+      : 'Deep Think is OFF (click or Cmd/Ctrl+Shift+D to turn on)';
   };
 
   const toggleChip = () => {
-    perMessageEnabled = !perMessageEnabled;
+    setEnabled(!isEnabled());
     const chip = document.getElementById('claude-dt-chip');
     if (chip) updateChipVisual(chip);
   };
 
+  // Pinned to the bottom-right corner of the viewport. No anchoring to
+  // claude.ai's DOM — nothing to jump to.
   const positionChip = (chip) => {
-    const sendBtn = document.querySelector('button[aria-label*="Send" i], button[data-testid*="send" i]');
-    if (sendBtn) {
-      const r = sendBtn.getBoundingClientRect();
-      // Sit just to the LEFT of the send button, vertically centered on it.
-      const chipRect = chip.getBoundingClientRect();
-      chip.style.left = Math.max(8, r.left - chipRect.width - 10) + 'px';
-      chip.style.top = (r.top + r.height / 2 - chipRect.height / 2) + 'px';
-      chip.style.right = 'auto';
-      chip.style.bottom = 'auto';
-    } else {
-      chip.style.left = 'auto';
-      chip.style.top = 'auto';
-      chip.style.right = '20px';
-      chip.style.bottom = '96px';
-    }
+    chip.style.left = 'auto';
+    chip.style.top = 'auto';
+    chip.style.right = '20px';
+    chip.style.bottom = '96px';
   };
 
   const ensureChip = () => {
@@ -101,12 +125,18 @@
       const state = document.createElement('span');
       state.className = 'claude-dt-state';
       state.textContent = 'ON';
-      chip.append(dot, label, state);
-      chip.addEventListener('click', (e) => {
+      const sw = document.createElement('span');
+      sw.className = 'claude-dt-switch';
+      sw.setAttribute('aria-hidden', 'true');
+      chip.append(dot, label, state, sw);
+      const handleToggle = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         toggleChip();
-      });
+      };
+      chip.addEventListener('click', handleToggle);
+      chip.addEventListener('mousedown', (e) => e.stopPropagation());
       (document.body || document.documentElement).appendChild(chip);
     }
     updateChipVisual(chip);
@@ -136,17 +166,16 @@
     }
   }, true);
 
-  // After any send we detect, auto-reset the override back to ON so the
-  // user doesn't silently lose Deep Think on the *next* message.
-  const scheduleResetAfterSend = () => {
-    setTimeout(() => {
-      if (!perMessageEnabled) {
-        perMessageEnabled = true;
-        const chip = document.getElementById('claude-dt-chip');
-        if (chip) updateChipVisual(chip);
-      }
-    }, 500);
-  };
+  // Re-sync chip visuals whenever content.js writes a new value to the
+  // dataset (e.g. after a storage roundtrip on another tab).
+  const chipObserver = new MutationObserver(() => {
+    const chip = document.getElementById('claude-dt-chip');
+    if (chip) updateChipVisual(chip);
+  });
+  chipObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-claude-dt-enabled'],
+  });
 
   const findEditor = () => {
     return document.querySelector('div.ProseMirror[contenteditable="true"]')
@@ -192,7 +221,6 @@
     const btn = e.target?.closest?.('button[aria-label*="Send" i], button[data-testid*="send" i]');
     if (!btn) return;
     appendInstructionToEditor();
-    scheduleResetAfterSend();
   }, true);
 
   // Capture-phase Enter inside the editor
@@ -201,7 +229,6 @@
     const editor = e.target?.closest?.('[contenteditable="true"]');
     if (!editor) return;
     appendInstructionToEditor();
-    scheduleResetAfterSend();
   }, true);
 
   // Fetch fallback: if the editor-append missed for any reason, still
