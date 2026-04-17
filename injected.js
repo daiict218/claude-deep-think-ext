@@ -121,8 +121,8 @@
         border: 1px solid #333;
         border-top: none;
         border-radius: 0 0 14px 14px;
-        font: italic 11px/1.4 'Georgia', 'Times New Roman', serif;
-        color: #7a7a9a;
+        font: italic 12px/1.4 'Georgia', 'Times New Roman', serif;
+        color: #b0b0cc;
         text-align: center;
         white-space: nowrap;
         overflow: hidden;
