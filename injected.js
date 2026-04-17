@@ -114,20 +114,22 @@
       /* ── Description bar below chip ── */
       #claude-dt-desc {
         position: fixed; z-index: 2147483646;
-        right: 20px; bottom: 72px;
-        max-width: 380px;
-        padding: 5px 14px;
-        background: rgba(20, 20, 42, 0.85);
-        border: 1px solid #2a2a3e;
-        border-radius: 8px;
-        font: 400 11px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: #999;
+        right: 20px; bottom: 68px;
+        /* width is synced to chip width via JS */
+        padding: 7px 16px;
+        background: #16162b;
+        border: 1px solid #333;
+        border-top: none;
+        border-radius: 0 0 14px 14px;
+        font: italic 11px/1.4 'Georgia', 'Times New Roman', serif;
+        color: #7a7a9a;
         text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        backdrop-filter: blur(6px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         transition: opacity .2s;
+        letter-spacing: .2px;
       }
       #claude-dt-desc.hidden { opacity: 0; }
       #claude-dt-chip .cdt-on-off {
@@ -292,15 +294,21 @@
     const onOffEl = chip.querySelector('.cdt-on-off');
     if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
 
-    // Update description bar
+    // Update description bar — match chip width, show instruction preview
     const descEl = document.getElementById('claude-dt-desc');
     if (descEl) {
       if (active && on) {
-        const instrPreview = (active.instruction || '').slice(0, 90);
-        descEl.textContent = instrPreview + (instrPreview.length < (active.instruction || '').length ? '...' : '');
+        const instr = active.instruction || '';
+        const preview = instr.slice(0, 100);
+        descEl.textContent = '\u201C' + preview + (preview.length < instr.length ? '...' : '') + '\u201D';
         descEl.classList.remove('hidden');
+        // Sync width to chip
+        const chipRect = chip.getBoundingClientRect();
+        descEl.style.width = chipRect.width + 'px';
+        chip.style.borderRadius = '14px 14px 0 0';
       } else {
         descEl.classList.add('hidden');
+        chip.style.borderRadius = '14px';
       }
     }
 
