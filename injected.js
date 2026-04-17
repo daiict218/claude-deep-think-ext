@@ -49,10 +49,16 @@
     const style = document.createElement('style');
     style.id = 'claude-dt-styles';
     style.textContent = `
-      /* ── Chip: two-zone layout ── */
-      #claude-dt-chip {
+      /* ── Widget container ── */
+      #claude-dt-widget {
         position: fixed; z-index: 2147483647;
         right: 20px; bottom: 96px;
+        display: flex; flex-direction: column;
+        align-items: stretch;
+      }
+
+      /* ── Chip: two-zone layout ── */
+      #claude-dt-chip {
         display: flex; align-items: stretch;
         background: #16162b; border: 1px solid #333;
         border-radius: 14px; overflow: hidden;
@@ -113,8 +119,6 @@
 
       /* ── Description bar below chip ── */
       #claude-dt-desc {
-        position: fixed; z-index: 2147483646;
-        right: 20px; bottom: 68px;
         padding: 8px 16px;
         background: #16162b;
         border: 1px solid #333;
@@ -321,8 +325,6 @@
 
         descEl.append(label, text);
         descEl.classList.remove('hidden');
-        const chipRect = chip.getBoundingClientRect();
-        descEl.style.width = chipRect.width + 'px';
         chip.style.borderRadius = '14px 14px 0 0';
       } else {
         descEl.classList.add('hidden');
@@ -360,6 +362,14 @@
 
   const ensureChip = () => {
     injectStyles();
+    // Ensure widget container exists
+    let widget = document.getElementById('claude-dt-widget');
+    if (!widget) {
+      widget = document.createElement('div');
+      widget.id = 'claude-dt-widget';
+      (document.body || document.documentElement).appendChild(widget);
+    }
+
     let chip = document.getElementById('claude-dt-chip');
     if (!chip) {
       chip = document.createElement('div');
@@ -443,14 +453,14 @@
       });
 
       chip.append(zoneProfile, zoneToggle);
-      (document.body || document.documentElement).appendChild(chip);
+      widget.appendChild(chip);
     }
 
-    // Ensure description bar exists
+    // Ensure description bar exists inside widget
     if (!document.getElementById('claude-dt-desc')) {
       const desc = document.createElement('div');
       desc.id = 'claude-dt-desc';
-      (document.body || document.documentElement).appendChild(desc);
+      widget.appendChild(desc);
     }
 
     updateChipVisual(chip);
