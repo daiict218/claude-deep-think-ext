@@ -108,7 +108,13 @@ At one point the extension showed a banner saying "settings changed, refresh the
 
 Even when the string is a compile-time constant with no variables, using `innerHTML` leaves a loaded gun lying around — the next contributor will interpolate a variable into it and introduce an XSS primitive. Use `createElement` + `textContent` + `append` from the start. The extra four lines are worth it.
 
-### L8 — An agent that's disabled and an agent that's silently broken look identical.
+### L8 — Width-sync via JS causes visible frame jumps.
+Setting one element's width from another's `getBoundingClientRect()` causes a render flash because the DOM paints before the sync runs. CSS layout (flex/grid containers with `align-items: stretch`) eliminates this entirely. **Rule:** if two elements must match widths, make them siblings in a flex-column container. Never sync widths via JS.
+
+### L9 — Push back on bad design before implementing it.
+Multiple rounds of bad contrast, wrong fonts, and tiny chevrons shipped because Pooja implemented exactly what was specced without questioning whether it looked right. The user explicitly said "you're a developer but you can think through design principles." **Rule:** before implementing a visual change, check: (a) does every text/bg pair pass WCAG AA contrast? (b) is the font family consistent with the rest of the UI? (c) is the primary action reachable in 1 click? If any answer is no, push back on Designer before writing code.
+
+### L10 — An agent that's disabled and an agent that's silently broken look identical.
 
 When the Save button was CSP-blocked, it gave zero feedback — no toast, no button state change, no console error in the obvious place. The user correctly called this out as terrible UX. Every interactive control must produce feedback within 100ms: button label swap, toast, border pulse, status line. Silence is a bug, not a feature.
 

@@ -50,6 +50,34 @@ Then form an opinion. When reviewing or proposing changes:
 - **Storage writes without `chrome.runtime.lastError` checks** — a save that silently fails is worse than one that errors loudly.
 - **Color-only state indicators** — the red/green dot next to the title should be paired with a text label or `aria-label` for colorblind users.
 
+## Hard lessons from past reviews (do NOT repeat)
+
+These are concrete design failures that were shipped and caught by the user. Each one wasted the user's time and trust.
+
+### DL1 — Contrast is not negotiable. Check the math, not your eyes.
+Multiple iterations shipped text that was nearly invisible (#7a7a9a on #16162b, #666 on #1a1a2e, #555 on #0f0f1a). "It looks fine on my screen" is not a valid defense. **Rule:** every text/background pair must pass WCAG AA (4.5:1 for normal text, 3:1 for large text). Use the formula or a contrast checker. Minimum text color on the dark palette: `#ccc` for body text, `#999` for secondary/muted text. Never go below #999.
+
+### DL2 — Serif fonts don't belong in a UI that's otherwise sans-serif.
+Using Georgia italic for the description bar clashed with the system sans-serif everywhere else. It looked like a Word document pasted into a terminal. **Rule:** use one font family across the entire extension. The established stack is `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`. Style variations (italic, weight, size) within that family are fine. Introducing a second family requires explicit user request.
+
+### DL3 — Unicode symbols render inconsistently. Use CSS or text.
+The chevron ▾ (U+25BE) and ▲ (U+25B2) rendered differently across platforms — some showed a tiny speck, others a chunky triangle. **Rule:** never use Unicode symbols as primary interaction affordances. Use CSS-drawn shapes (border triangles, transforms) or plain text labels ("Switch", "Manage"). Text > icons for discoverability.
+
+### DL4 — If it takes 2 clicks, ask if it could take 1.
+The "Switch → pick profile" flow was 2 clicks for the most common action (switching profiles). The user explicitly asked for 1-click. **Rule:** the most frequent user action should have the shortest interaction path. If a popover is required for management (create/edit/delete), fine — but don't force the popover for the primary action (switching). Inline controls > popovers for frequent actions.
+
+### DL5 — Width-sync via JS causes frame-of-mismatch jumps.
+Setting one element's width from another's `getBoundingClientRect()` in JS causes a visible flash because the DOM renders before the sync runs. **Rule:** when two elements must share the same width, put them in a shared flex/grid container and let CSS handle it. Never sync widths via JS unless there is literally no CSS alternative.
+
+### DL6 — Stop incrementally patching. Redesign when the foundation is wrong.
+Multiple rounds of "+2px here, different color there" made things worse, not better. The user correctly called this out. **Rule:** if the user rejects a design twice, the problem is structural, not parametric. Step back, identify what's fundamentally wrong (wrong font? wrong layout? wrong affordance?), and rebuild that part from scratch. Three small patches ≠ one correct design.
+
+### DL7 — Expanding content goes downward, never upward.
+When a UI element anchored to the bottom of the viewport gains new content (a description bar, a dropdown, a tooltip), the new content must expand **downward** — not push the anchor element upward. Upward jumps feel unnatural and disorienting. **Rule:** if the widget is `position: fixed; bottom: Npx`, any expandable child must be `position: absolute; top: 100%` so it grows downward from the anchor without moving it. Never use flex-direction column in a bottom-anchored container for expandable content — it grows the container upward.
+
+### DL8 — Font sizes below 12px are hard to read. Period.
+Multiple elements shipped at 9px, 10px, 11px. The user called them "so small." **Rule:** minimum font size is 12px for any text the user needs to read. 11px is acceptable only for non-essential metadata (counters, timestamps). 10px and below is reserved for `letter-spacing` labels that are uppercase and short (e.g., "PROMPT"). Never set body text below 12px.
+
 ## Output format
 
 When the main agent or the user asks you to review or change something, respond with:
