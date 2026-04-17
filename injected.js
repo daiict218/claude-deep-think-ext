@@ -10,7 +10,7 @@
 
   const setEnabled = (value) => {
     document.documentElement.dataset.claudeDtEnabled = value ? '1' : '0';
-    window.postMessage({ type: 'CLAUDE_DT_TOGGLE', enabled: value }, '*');
+    window.postMessage({ type: 'CLAUDE_DT_TOGGLE', enabled: value }, window.location.origin);
   };
 
   const getProfiles = () => {
@@ -32,7 +32,7 @@
     if (active) {
       document.documentElement.dataset.claudeDtInstruction = active.instruction;
     }
-    window.postMessage({ type: 'CLAUDE_DT_SET_PROFILES', profiles: raw }, '*');
+    window.postMessage({ type: 'CLAUDE_DT_SET_PROFILES', profiles: raw }, window.location.origin);
   };
 
   const generateId = () => 'profile-' + Date.now();
@@ -360,10 +360,24 @@
   // ── Popover ────────────────────────────────────────────────────────
 
   let editingProfileId = null;
+  let _outsideHandler = null;
+  let _escHandler = null;
+
+  const _cleanupListeners = () => {
+    if (_outsideHandler) {
+      document.removeEventListener('click', _outsideHandler, true);
+      _outsideHandler = null;
+    }
+    if (_escHandler) {
+      document.removeEventListener('keydown', _escHandler, true);
+      _escHandler = null;
+    }
+  };
 
   const isPopoverOpen = () => !!document.getElementById('claude-dt-popover');
 
   const closePopover = () => {
+    _cleanupListeners();
     const pop = document.getElementById('claude-dt-popover');
     if (pop) pop.remove();
     editingProfileId = null;
@@ -434,27 +448,28 @@
 
     (document.body || document.documentElement).appendChild(pop);
 
+    // Clean up any previous listeners before attaching new ones
+    _cleanupListeners();
+
     // Click outside to close
     setTimeout(() => {
-      const outsideHandler = (e) => {
+      _outsideHandler = (e) => {
         const popEl = document.getElementById('claude-dt-popover');
         const chipEl = document.getElementById('claude-dt-chip');
         if (popEl && !popEl.contains(e.target) && chipEl && !chipEl.contains(e.target)) {
           closePopover();
-          document.removeEventListener('click', outsideHandler, true);
         }
       };
-      document.addEventListener('click', outsideHandler, true);
+      document.addEventListener('click', _outsideHandler, true);
     }, 0);
 
     // Escape to close
-    const escHandler = (e) => {
+    _escHandler = (e) => {
       if (e.key === 'Escape') {
         closePopover();
-        document.removeEventListener('keydown', escHandler, true);
       }
     };
-    document.addEventListener('keydown', escHandler, true);
+    document.addEventListener('keydown', _escHandler, true);
   };
 
   const buildProfileItem = (profile, isActive, profiles) => {
@@ -474,7 +489,8 @@
 
     const preview = document.createElement('div');
     preview.className = 'cdt-p-preview';
-    preview.textContent = (profile.instruction || '').slice(0, 80) + (profile.instruction.length > 80 ? '...' : '');
+    const instrText = profile.instruction || '';
+    preview.textContent = instrText.slice(0, 80) + (instrText.length > 80 ? '...' : '');
 
     info.append(name, preview);
 
@@ -551,7 +567,7 @@
 
     const instructionInput = document.createElement('textarea');
     instructionInput.placeholder = 'Instruction to append to every message...';
-    instructionInput.value = profile.instruction;
+    instructionInput.value = profile.instruction || '';
 
     const btns = document.createElement('div');
     btns.className = 'cdt-editor-btns';
@@ -606,7 +622,9 @@
   const observer = new MutationObserver(() => {
     const chip = document.getElementById('claude-dt-chip');
     if (chip) updateChipVisual(chip);
-    if (isPopoverOpen()) openPopover();
+    // Only rebuild the popover if the user is NOT mid-edit.
+    // Rebuilding while editing destroys typed text in the input fields.
+    if (isPopoverOpen() && !editingProfileId) openPopover();
   });
   observer.observe(document.documentElement, {
     attributes: true,
