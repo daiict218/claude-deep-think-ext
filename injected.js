@@ -110,6 +110,26 @@
         border: none; margin-left: 2px;
       }
       #claude-dt-chip .cdt-gear:hover { color: #fff; background: #2a2a50; }
+
+      /* ── Description bar below chip ── */
+      #claude-dt-desc {
+        position: fixed; z-index: 2147483646;
+        right: 20px; bottom: 72px;
+        max-width: 380px;
+        padding: 5px 14px;
+        background: rgba(20, 20, 42, 0.85);
+        border: 1px solid #2a2a3e;
+        border-radius: 8px;
+        font: 400 11px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #999;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        backdrop-filter: blur(6px);
+        transition: opacity .2s;
+      }
+      #claude-dt-desc.hidden { opacity: 0; }
       #claude-dt-chip .cdt-on-off {
         font-size: 13px; font-weight: 700; color: #4ade80;
         letter-spacing: .3px; min-width: 26px; text-align: center;
@@ -272,6 +292,18 @@
     const onOffEl = chip.querySelector('.cdt-on-off');
     if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
 
+    // Update description bar
+    const descEl = document.getElementById('claude-dt-desc');
+    if (descEl) {
+      if (active && on) {
+        const instrPreview = (active.instruction || '').slice(0, 90);
+        descEl.textContent = instrPreview + (instrPreview.length < (active.instruction || '').length ? '...' : '');
+        descEl.classList.remove('hidden');
+      } else {
+        descEl.classList.add('hidden');
+      }
+    }
+
     // Rebuild profile circles
     const circlesEl = chip.querySelector('.cdt-circles');
     if (circlesEl && profiles.items.length > 1) {
@@ -387,6 +419,14 @@
       chip.append(zoneProfile, zoneToggle);
       (document.body || document.documentElement).appendChild(chip);
     }
+
+    // Ensure description bar exists
+    if (!document.getElementById('claude-dt-desc')) {
+      const desc = document.createElement('div');
+      desc.id = 'claude-dt-desc';
+      (document.body || document.documentElement).appendChild(desc);
+    }
+
     updateChipVisual(chip);
   };
 
