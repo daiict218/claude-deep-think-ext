@@ -2,63 +2,46 @@ const DEFAULT_INSTRUCTION = `Always reason thoroughly and deeply. Treat every re
 
 const toggle = document.getElementById('toggle');
 const dot = document.getElementById('statusDot');
-const textarea = document.getElementById('instruction');
-const saveBtn = document.getElementById('saveBtn');
-const resetBtn = document.getElementById('resetBtn');
-const statusEl = document.getElementById('status');
+const profileNameEl = document.getElementById('profileName');
+const profileInstructionEl = document.getElementById('profileInstruction');
 
-const flash = (msg, isError = false) => {
-  statusEl.textContent = msg;
-  statusEl.classList.toggle('error', isError);
-  statusEl.classList.add('show');
-  clearTimeout(flash._t);
-  flash._t = setTimeout(() => {
-    statusEl.classList.remove('show');
-  }, 2000);
+const renderProfile = (profilesRaw) => {
+  try {
+    const profiles = JSON.parse(profilesRaw);
+    if (profiles && Array.isArray(profiles.items)) {
+      const active = profiles.items.find(p => p.id === profiles.activeId);
+      if (active) {
+        profileNameEl.textContent = active.name;
+        profileInstructionEl.textContent = active.instruction;
+        return;
+      }
+    }
+  } catch {}
+  profileNameEl.textContent = 'Deep Reasoning';
+  profileInstructionEl.textContent = DEFAULT_INSTRUCTION;
 };
 
-chrome.storage.local.get(['enabled', 'instruction'], (data) => {
+chrome.storage.local.get(['enabled', 'profiles'], (data) => {
   const enabled = data.enabled !== false;
   toggle.checked = enabled;
   dot.classList.toggle('active', enabled);
-
-  if (typeof data.instruction === 'string' && data.instruction.trim().length > 0) {
-    textarea.value = data.instruction;
-  }
+  renderProfile(data.profiles);
 });
 
 toggle.addEventListener('change', () => {
   const enabled = toggle.checked;
   chrome.storage.local.set({ enabled });
   dot.classList.toggle('active', enabled);
-  // content.js listens via chrome.storage.onChanged — no direct message needed.
 });
 
-saveBtn.addEventListener('click', () => {
-  const value = textarea.value.trim();
-  if (!value) {
-    flash('Cannot save empty instruction', true);
-    return;
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if ('enabled' in changes) {
+    const enabled = changes.enabled.newValue !== false;
+    toggle.checked = enabled;
+    dot.classList.toggle('active', enabled);
   }
-  chrome.storage.local.set({ instruction: value }, () => {
-    if (chrome.runtime.lastError) {
-      flash('Save failed: ' + chrome.runtime.lastError.message, true);
-      return;
-    }
-    const original = saveBtn.textContent;
-    saveBtn.textContent = '✓ Saved';
-    saveBtn.classList.add('saved');
-    textarea.classList.add('flash-save');
-    flash('Instruction saved — refresh claude.ai to apply');
-    setTimeout(() => {
-      saveBtn.textContent = original;
-      saveBtn.classList.remove('saved');
-      textarea.classList.remove('flash-save');
-    }, 1500);
-  });
-});
-
-resetBtn.addEventListener('click', () => {
-  textarea.value = DEFAULT_INSTRUCTION;
-  textarea.focus();
+  if ('profiles' in changes) {
+    renderProfile(changes.profiles.newValue);
+  }
 });

@@ -16,120 +16,57 @@
     gap: 10px;
     margin-bottom: 16px;
   }
-  .header h1 {
-    font-size: 15px;
-    font-weight: 600;
-    color: #fff;
-  }
+  .header h1 { font-size: 15px; font-weight: 600; color: #fff; }
   .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: #e94560;
-    flex-shrink: 0;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e94560; flex-shrink: 0;
   }
   .dot.active { background: #4ade80; }
   .toggle-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 0;
-    border-top: 1px solid #1e1e30;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-top: 1px solid #1e1e30;
   }
   .toggle-label { font-size: 13px; color: #aaa; }
-  .switch {
-    position: relative;
-    width: 44px; height: 24px;
-    cursor: pointer;
-  }
+  .switch { position: relative; width: 44px; height: 24px; cursor: pointer; }
   .switch input { display: none; }
   .slider {
     position: absolute; inset: 0;
-    background: #2a2a3e;
-    border-radius: 12px;
-    transition: 0.2s;
+    background: #2a2a3e; border-radius: 12px; transition: 0.2s;
   }
   .slider:before {
-    content: '';
-    position: absolute;
-    width: 18px; height: 18px;
-    left: 3px; top: 3px;
-    background: #888;
-    border-radius: 50%;
-    transition: 0.2s;
+    content: ''; position: absolute;
+    width: 18px; height: 18px; left: 3px; top: 3px;
+    background: #888; border-radius: 50%; transition: 0.2s;
   }
   .switch input:checked + .slider { background: #1a3a2a; }
   .switch input:checked + .slider:before {
-    transform: translateX(20px);
-    background: #4ade80;
+    transform: translateX(20px); background: #4ade80;
   }
-  .label {
-    margin-top: 14px;
-    margin-bottom: 6px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #888;
+  .profile-section {
+    margin-top: 14px; padding: 12px;
+    background: #1a1a2e; border-radius: 8px;
+    border-left: 2px solid #4ade80;
   }
-  textarea.instruction {
-    width: 100%;
-    min-height: 120px;
-    resize: vertical;
-    padding: 10px;
-    background: #1a1a2e;
-    color: #ddd;
-    border: 1px solid #2a2a3e;
-    border-left: 2px solid #e94560;
-    border-radius: 6px;
-    font-size: 11px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    line-height: 1.5;
-    outline: none;
+  .profile-label {
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: .5px; color: #888; margin-bottom: 6px;
   }
-  textarea.instruction:focus { border-color: #4ade80; border-left-color: #4ade80; }
-  textarea.instruction.flash-save {
-    border-color: #4ade80;
-    border-left-color: #4ade80;
-    box-shadow: 0 0 0 2px rgba(74,222,128,0.25);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  .profile-name {
+    font-size: 13px; font-weight: 500; color: #fff;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
+  .profile-instruction {
+    margin-top: 8px; font-size: 10px; color: #777;
+    line-height: 1.5; max-height: 60px; overflow: hidden;
+    text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   }
-  button {
-    flex: 1;
-    padding: 8px 10px;
-    font-size: 12px;
-    font-weight: 500;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: 0.15s;
+  .manage-note {
+    margin-top: 14px; font-size: 10px; color: #555;
+    text-align: center; line-height: 1.5;
   }
-  button.save { background: #4ade80; color: #0f0f1a; }
-  button.save:hover { background: #22c55e; }
-  button.save.saved { background: #22c55e; color: #0f0f1a; }
-  button.reset { background: #2a2a3e; color: #ccc; }
-  button.reset:hover { background: #3a3a4e; }
-  .status {
-    margin-top: 10px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #4ade80;
-    min-height: 16px;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  .status.show { opacity: 1; }
-  .status.error { color: #e94560; }
   .footer {
-    margin-top: 14px;
-    font-size: 10px;
-    color: #555;
-    text-align: center;
+    margin-top: 14px; font-size: 10px; color: #555; text-align: center;
   }
 </style>
 </head>
@@ -145,13 +82,14 @@
       <span class="slider"></span>
     </label>
   </div>
-  <div class="label">Instruction appended to every message</div>
-  <textarea class="instruction" id="instruction" spellcheck="false">Always reason thoroughly and deeply. Treat every request as complex unless I explicitly say otherwise. Never optimize for brevity at the expense of quality. Think step-by-step, consider tradeoffs, and provide comprehensive analysis.</textarea>
-  <div class="actions">
-    <button class="reset" id="resetBtn" type="button">Reset</button>
-    <button class="save" id="saveBtn" type="button">Save</button>
+  <div class="profile-section">
+    <div class="profile-label">Active profile</div>
+    <div class="profile-name" id="profileName">Deep Reasoning</div>
+    <div class="profile-instruction" id="profileInstruction"></div>
   </div>
-  <div class="status" id="status"></div>
+  <div class="manage-note">
+    Click the <strong>&#9650;</strong> on the Deep Think chip on claude.ai<br>to manage your prompt profiles
+  </div>
   <div class="footer">Appended silently to every message on claude.ai</div>
 
   <script src="popup.js"></script>

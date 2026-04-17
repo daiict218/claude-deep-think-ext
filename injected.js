@@ -1,10 +1,10 @@
 (() => {
   const DEFAULT_INSTRUCTION = `Always reason thoroughly and deeply. Treat every request as complex unless I explicitly say otherwise. Never optimize for brevity at the expense of quality. Think step-by-step, consider tradeoffs, and provide comprehensive analysis.`;
   const SEPARATOR = '\n\n---\n\n';
+  const MAX_PROFILES = 5;
 
-  // Single source of truth: document.documentElement.dataset.claudeDtEnabled,
-  // persisted to chrome.storage.local by content.js. Popup toggle and chip
-  // both read/write this same flag, so they are always in sync.
+  // ── State helpers ──────────────────────────────────────────────────
+
   const isEnabled = () =>
     document.documentElement.dataset.claudeDtEnabled !== '0';
 
@@ -13,169 +13,607 @@
     window.postMessage({ type: 'CLAUDE_DT_TOGGLE', enabled: value }, '*');
   };
 
-  const getState = () => {
-    const root = document.documentElement;
-    const instruction = root.dataset.claudeDtInstruction || DEFAULT_INSTRUCTION;
-    return { enabled: isEnabled(), instruction };
+  const getProfiles = () => {
+    try {
+      const raw = document.documentElement.dataset.claudeDtProfiles;
+      const p = JSON.parse(raw);
+      if (p && Array.isArray(p.items) && p.items.length > 0) return p;
+    } catch {}
+    return {
+      activeId: 'profile-default',
+      items: [{ id: 'profile-default', name: 'Deep Reasoning', instruction: DEFAULT_INSTRUCTION }]
+    };
   };
 
-  // ---------- Floating chip UI ----------
-  const injectChipStyles = () => {
-    if (document.getElementById('claude-dt-chip-styles')) return;
+  const setProfiles = (profilesObj) => {
+    const raw = JSON.stringify(profilesObj);
+    document.documentElement.dataset.claudeDtProfiles = raw;
+    const active = profilesObj.items.find(p => p.id === profilesObj.activeId);
+    if (active) {
+      document.documentElement.dataset.claudeDtInstruction = active.instruction;
+    }
+    window.postMessage({ type: 'CLAUDE_DT_SET_PROFILES', profiles: raw }, '*');
+  };
+
+  const generateId = () => 'profile-' + Date.now();
+
+  const getState = () => ({
+    enabled: isEnabled(),
+    instruction: document.documentElement.dataset.claudeDtInstruction || DEFAULT_INSTRUCTION,
+  });
+
+  // ── Styles ─────────────────────────────────────────────────────────
+
+  const injectStyles = () => {
+    if (document.getElementById('claude-dt-styles')) return;
     const style = document.createElement('style');
-    style.id = 'claude-dt-chip-styles';
+    style.id = 'claude-dt-styles';
     style.textContent = `
+      /* ── Chip: two-zone layout ── */
       #claude-dt-chip {
         position: fixed; z-index: 2147483647;
-        display: inline-flex; align-items: center; gap: 8px;
-        padding: 7px 12px 7px 12px; margin: 0;
-        background: #1a1a2e; color: #e0e0e0;
-        border: 1px solid #2a2a3e;
-        border-left: 2px solid #4ade80;
-        border-radius: 999px;
-        font: 500 11px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        cursor: pointer; user-select: none;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.45);
-        transition: border-color .15s ease, opacity .15s ease, transform .15s ease;
+        right: 20px; bottom: 96px;
+        display: flex; align-items: stretch;
+        background: #16162b; border: 1px solid #333;
+        border-radius: 14px; overflow: hidden;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        user-select: none;
       }
-      #claude-dt-chip:hover { transform: translateY(-1px); }
-      #claude-dt-chip:focus-visible {
-        outline: 2px solid #4ade80; outline-offset: 2px;
+      #claude-dt-chip .cdt-zone-profile {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 16px; cursor: pointer;
+        border-right: 1px solid #333;
+        transition: background .12s;
       }
-      #claude-dt-chip .claude-dt-dot {
-        width: 7px; height: 7px; border-radius: 50%;
-        background: #4ade80;
-        transition: background .15s ease;
+      #claude-dt-chip .cdt-zone-profile:hover { background: #1f1f3a; }
+      #claude-dt-chip .cdt-zone-profile:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
+      #claude-dt-chip .cdt-zone-toggle {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 14px; cursor: pointer;
+        transition: background .12s;
       }
-      #claude-dt-chip .claude-dt-state {
-        color: #4ade80; font-weight: 600; letter-spacing: .3px;
-        min-width: 22px; text-align: right;
-        transition: color .15s ease;
+      #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
+      #claude-dt-chip .cdt-zone-toggle:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
+      #claude-dt-chip .cdt-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #4ade80; flex-shrink: 0; transition: background .15s;
       }
-      #claude-dt-chip .claude-dt-switch {
-        position: relative;
-        width: 26px; height: 14px;
-        border-radius: 7px;
-        background: #1a3a2a;
-        transition: background .15s ease;
-        flex-shrink: 0;
+      #claude-dt-chip .cdt-profile-label {
+        font-size: 14px; font-weight: 600; color: #fff;
+        max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; line-height: 1.2;
       }
-      #claude-dt-chip .claude-dt-switch::after {
+      #claude-dt-chip .cdt-switch-label {
+        font-size: 12px; font-weight: 600; color: #4ade80;
+        padding: 4px 10px; border-radius: 6px;
+        background: rgba(74, 222, 128, 0.1);
+        border: 1px solid rgba(74, 222, 128, 0.25);
+        white-space: nowrap; flex-shrink: 0;
+        transition: background .15s, color .15s;
+        display: flex; align-items: center; gap: 5px;
+      }
+      #claude-dt-chip .cdt-switch-label::after {
         content: '';
-        position: absolute;
-        top: 2px; left: 2px;
-        width: 10px; height: 10px;
-        border-radius: 50%;
-        background: #4ade80;
-        transform: translateX(12px);
-        transition: transform .18s ease, background .15s ease;
+        width: 0; height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 5px solid #4ade80;
+        transition: transform .2s;
       }
-      #claude-dt-chip.off { border-left-color: #e94560; opacity: .85; }
-      #claude-dt-chip.off .claude-dt-dot { background: #e94560; }
-      #claude-dt-chip.off .claude-dt-state { color: #e94560; }
-      #claude-dt-chip.off .claude-dt-switch { background: #3a1f26; }
-      #claude-dt-chip.off .claude-dt-switch::after {
-        transform: translateX(0);
-        background: #e94560;
+      #claude-dt-chip .cdt-switch-label.open::after { transform: rotate(180deg); }
+      #claude-dt-chip .cdt-switch-label:hover {
+        background: rgba(74, 222, 128, 0.2);
+        color: #6cf5a0;
       }
+      #claude-dt-chip .cdt-on-off {
+        font-size: 13px; font-weight: 700; color: #4ade80;
+        letter-spacing: .3px; min-width: 26px; text-align: center;
+        transition: color .15s;
+      }
+      #claude-dt-chip .cdt-switch {
+        position: relative; width: 32px; height: 18px;
+        border-radius: 9px; background: #1a3a2a;
+        transition: background .15s; flex-shrink: 0;
+      }
+      #claude-dt-chip .cdt-switch::after {
+        content: ''; position: absolute; top: 3px; left: 3px;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #4ade80; transform: translateX(14px);
+        transition: transform .18s, background .15s;
+      }
+      /* OFF state */
+      #claude-dt-chip.off .cdt-dot { background: #e94560; }
+      #claude-dt-chip.off .cdt-on-off { color: #e94560; }
+      #claude-dt-chip.off .cdt-switch { background: #3a1f26; }
+      #claude-dt-chip.off .cdt-switch::after { transform: translateX(0); background: #e94560; }
+
+      /* ── Popover ── */
+      #claude-dt-popover {
+        position: fixed; z-index: 2147483647;
+        right: 20px; bottom: 150px;
+        width: 340px;
+        background: #141428; border: 1px solid #333;
+        border-radius: 14px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #e0e0e0; overflow: hidden;
+      }
+      #claude-dt-popover .cdt-pop-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 18px; border-bottom: 1px solid #282840;
+      }
+      #claude-dt-popover .cdt-pop-title {
+        font-size: 15px; font-weight: 700; color: #fff;
+      }
+      #claude-dt-popover .cdt-pop-count {
+        font-size: 12px; color: #999; font-weight: 500;
+        background: #1e1e36; padding: 2px 8px; border-radius: 10px;
+      }
+      #claude-dt-popover .cdt-pop-list { padding: 6px 0; max-height: 340px; overflow-y: auto; }
+
+      /* ── Profile item ── */
+      #claude-dt-popover .cdt-p-item {
+        display: flex; align-items: flex-start; gap: 12px;
+        padding: 12px 18px; cursor: pointer;
+        transition: background .1s; position: relative;
+        border-left: 3px solid transparent;
+      }
+      #claude-dt-popover .cdt-p-item:hover { background: #1c1c38; }
+      #claude-dt-popover .cdt-p-item.active {
+        background: #132413;
+        border-left-color: #4ade80;
+      }
+      #claude-dt-popover .cdt-p-item.editing {
+        background: #1a1a30;
+        border-left-color: #60a5fa;
+      }
+      #claude-dt-popover .cdt-p-item.active.editing {
+        background: #132413;
+        border-left-color: #4ade80;
+      }
+      #claude-dt-popover .cdt-p-radio {
+        width: 14px; height: 14px; border-radius: 50%;
+        border: 2px solid #555; flex-shrink: 0;
+        margin-top: 2px; transition: .15s;
+      }
+      #claude-dt-popover .cdt-p-item.active .cdt-p-radio {
+        border-color: #4ade80; background: #4ade80;
+      }
+      #claude-dt-popover .cdt-p-info { flex: 1; min-width: 0; }
+      #claude-dt-popover .cdt-p-name {
+        font-size: 14px; font-weight: 600; color: #fff;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      #claude-dt-popover .cdt-p-preview {
+        font-size: 12px; color: #999; margin-top: 4px; line-height: 1.4;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      #claude-dt-popover .cdt-p-actions {
+        display: flex; gap: 4px; flex-shrink: 0; margin-top: 2px;
+      }
+      #claude-dt-popover .cdt-p-btn {
+        width: 28px; height: 28px; border: none; border-radius: 6px;
+        background: #1e1e36; color: #999; cursor: pointer;
+        font-size: 13px; display: flex; align-items: center;
+        justify-content: center; transition: .12s;
+      }
+      #claude-dt-popover .cdt-p-btn:hover { background: #2e2e4a; color: #fff; }
+      #claude-dt-popover .cdt-p-btn.delete:hover { background: #3a1a1a; color: #e94560; }
+
+      /* ── Footer ── */
+      #claude-dt-popover .cdt-pop-footer { padding: 12px 18px; border-top: 1px solid #282840; }
+      #claude-dt-popover .cdt-add-btn {
+        width: 100%; padding: 11px; border: 1px dashed #444;
+        background: transparent; color: #bbb; border-radius: 8px;
+        cursor: pointer; font: 600 13px -apple-system, sans-serif;
+        text-align: center; transition: .15s;
+      }
+      #claude-dt-popover .cdt-add-btn:hover { border-color: #4ade80; color: #4ade80; background: #0f1f0f; }
+      #claude-dt-popover .cdt-add-btn:disabled {
+        opacity: .35; cursor: default; border-color: #282840; color: #666;
+      }
+      #claude-dt-popover .cdt-add-btn:disabled:hover { background: transparent; color: #666; border-color: #282840; }
+
+      /* ── Inline editor ── */
+      #claude-dt-popover .cdt-editor { padding: 16px 18px; border-top: 1px solid #282840; }
+      #claude-dt-popover .cdt-editor-title {
+        font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px;
+      }
+      #claude-dt-popover .cdt-editor input,
+      #claude-dt-popover .cdt-editor textarea {
+        width: 100%; padding: 10px 12px; margin-bottom: 10px;
+        background: #0d0d1a; color: #eee; border: 1px solid #333;
+        border-radius: 8px; font: 13px/1.5 -apple-system, sans-serif;
+        outline: none; resize: vertical;
+      }
+      #claude-dt-popover .cdt-editor input:focus,
+      #claude-dt-popover .cdt-editor textarea:focus { border-color: #4ade80; box-shadow: 0 0 0 2px rgba(74,222,128,0.15); }
+      #claude-dt-popover .cdt-editor input { font-weight: 600; font-size: 14px; }
+      #claude-dt-popover .cdt-editor textarea { min-height: 100px; font-size: 12px; }
+      #claude-dt-popover .cdt-editor-btns {
+        display: flex; gap: 8px; justify-content: flex-end;
+      }
+      #claude-dt-popover .cdt-btn {
+        padding: 9px 20px; border: none; border-radius: 8px;
+        font: 600 13px -apple-system, sans-serif; cursor: pointer; transition: .15s;
+      }
+      #claude-dt-popover .cdt-btn-cancel { background: #2a2a3e; color: #ccc; }
+      #claude-dt-popover .cdt-btn-cancel:hover { background: #3a3a4e; }
+      #claude-dt-popover .cdt-btn-save { background: #4ade80; color: #0f0f1a; }
+      #claude-dt-popover .cdt-btn-save:hover { background: #22c55e; }
     `;
     (document.head || document.documentElement).appendChild(style);
   };
 
+  // ── Chip ───────────────────────────────────────────────────────────
+
   const updateChipVisual = (chip) => {
     const on = isEnabled();
     chip.classList.toggle('off', !on);
-    chip.setAttribute('aria-checked', on ? 'true' : 'false');
-    chip.querySelector('.claude-dt-state').textContent = on ? 'ON' : 'OFF';
-    chip.title = on
-      ? 'Deep Think is ON (click or Cmd/Ctrl+Shift+D to turn off)'
-      : 'Deep Think is OFF (click or Cmd/Ctrl+Shift+D to turn on)';
-  };
 
-  const toggleChip = () => {
-    setEnabled(!isEnabled());
-    const chip = document.getElementById('claude-dt-chip');
-    if (chip) updateChipVisual(chip);
-  };
+    const profiles = getProfiles();
+    const active = profiles.items.find(p => p.id === profiles.activeId);
 
-  // Pinned to the bottom-right corner of the viewport. No anchoring to
-  // claude.ai's DOM — nothing to jump to.
-  const positionChip = (chip) => {
-    chip.style.left = 'auto';
-    chip.style.top = 'auto';
-    chip.style.right = '20px';
-    chip.style.bottom = '96px';
+    const nameEl = chip.querySelector('.cdt-profile-label');
+    if (nameEl && active) nameEl.textContent = active.name;
+
+    const onOffEl = chip.querySelector('.cdt-on-off');
+    if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
   };
 
   const ensureChip = () => {
-    injectChipStyles();
+    injectStyles();
     let chip = document.getElementById('claude-dt-chip');
     if (!chip) {
-      chip = document.createElement('button');
+      chip = document.createElement('div');
       chip.id = 'claude-dt-chip';
-      chip.type = 'button';
-      chip.setAttribute('role', 'switch');
-      chip.setAttribute('aria-checked', 'true');
-      chip.setAttribute('aria-label', 'Deep Think instruction for the next message');
+
+      // ── Left zone: profile selector ──
+      const zoneProfile = document.createElement('div');
+      zoneProfile.className = 'cdt-zone-profile';
+      zoneProfile.setAttribute('role', 'button');
+      zoneProfile.setAttribute('aria-label', 'Select prompt profile');
+      zoneProfile.tabIndex = 0;
+
       const dot = document.createElement('span');
-      dot.className = 'claude-dt-dot';
-      const label = document.createElement('span');
-      label.className = 'claude-dt-label';
-      label.textContent = 'Deep Think';
-      const state = document.createElement('span');
-      state.className = 'claude-dt-state';
-      state.textContent = 'ON';
-      const sw = document.createElement('span');
-      sw.className = 'claude-dt-switch';
-      sw.setAttribute('aria-hidden', 'true');
-      chip.append(dot, label, state, sw);
-      const handleToggle = (e) => {
+      dot.className = 'cdt-dot';
+
+      const profileLabel = document.createElement('span');
+      profileLabel.className = 'cdt-profile-label';
+      profileLabel.textContent = '';
+
+      const switchLabel = document.createElement('span');
+      switchLabel.className = 'cdt-switch-label';
+      switchLabel.textContent = 'Switch';
+
+      zoneProfile.append(dot, profileLabel, switchLabel);
+      zoneProfile.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        toggleChip();
-      };
-      chip.addEventListener('click', handleToggle);
-      chip.addEventListener('mousedown', (e) => e.stopPropagation());
+        togglePopover();
+      });
+      zoneProfile.addEventListener('mousedown', (e) => e.stopPropagation());
+      zoneProfile.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          togglePopover();
+        }
+      });
+
+      // ── Right zone: ON/OFF toggle ──
+      const zoneToggle = document.createElement('div');
+      zoneToggle.className = 'cdt-zone-toggle';
+      zoneToggle.setAttribute('role', 'switch');
+      zoneToggle.setAttribute('aria-label', 'Toggle Deep Think on or off');
+      zoneToggle.tabIndex = 0;
+
+      const onOff = document.createElement('span');
+      onOff.className = 'cdt-on-off';
+      onOff.textContent = 'ON';
+
+      const sw = document.createElement('span');
+      sw.className = 'cdt-switch';
+
+      zoneToggle.append(onOff, sw);
+      zoneToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setEnabled(!isEnabled());
+        updateChipVisual(chip);
+      });
+      zoneToggle.addEventListener('mousedown', (e) => e.stopPropagation());
+      zoneToggle.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setEnabled(!isEnabled());
+          updateChipVisual(chip);
+        }
+      });
+
+      chip.append(zoneProfile, zoneToggle);
       (document.body || document.documentElement).appendChild(chip);
     }
     updateChipVisual(chip);
-    positionChip(chip);
   };
 
-  // Reposition on resize and periodically (cheap — single query + style writes)
-  // to track claude.ai's layout changes without a heavy MutationObserver.
-  window.addEventListener('resize', () => {
-    const chip = document.getElementById('claude-dt-chip');
-    if (chip) positionChip(chip);
-  });
-  setInterval(ensureChip, 1000);
-  // Kick off once the page has a body
+  setInterval(ensureChip, 2000);
   const bootChip = () => {
     if (document.body) ensureChip();
     else setTimeout(bootChip, 100);
   };
   bootChip();
 
-  // Hotkey: Cmd/Ctrl+Shift+D toggles the per-message override
+  // Hotkey: Cmd/Ctrl+Shift+D
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
       e.preventDefault();
       e.stopPropagation();
-      toggleChip();
+      setEnabled(!isEnabled());
+      const chip = document.getElementById('claude-dt-chip');
+      if (chip) updateChipVisual(chip);
     }
   }, true);
 
-  // Re-sync chip visuals whenever content.js writes a new value to the
-  // dataset (e.g. after a storage roundtrip on another tab).
-  const chipObserver = new MutationObserver(() => {
+  // ── Popover ────────────────────────────────────────────────────────
+
+  let editingProfileId = null;
+
+  const isPopoverOpen = () => !!document.getElementById('claude-dt-popover');
+
+  const closePopover = () => {
+    const pop = document.getElementById('claude-dt-popover');
+    if (pop) pop.remove();
+    editingProfileId = null;
+    const sl = document.querySelector('#claude-dt-chip .cdt-switch-label');
+    if (sl) sl.classList.remove('open');
+  };
+
+  const togglePopover = () => {
+    if (isPopoverOpen()) { closePopover(); return; }
+    openPopover();
+  };
+
+  const openPopover = () => {
+    const existing = document.getElementById('claude-dt-popover');
+    if (existing) existing.remove();
+    const sl = document.querySelector('#claude-dt-chip .cdt-switch-label');
+    if (sl) sl.classList.add('open');
+
+    const profiles = getProfiles();
+    const pop = document.createElement('div');
+    pop.id = 'claude-dt-popover';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'cdt-pop-header';
+    const title = document.createElement('span');
+    title.className = 'cdt-pop-title';
+    title.textContent = 'Prompt Profiles';
+    const count = document.createElement('span');
+    count.className = 'cdt-pop-count';
+    count.textContent = profiles.items.length + '/' + MAX_PROFILES;
+    header.append(title, count);
+    pop.appendChild(header);
+
+    // List
+    const list = document.createElement('div');
+    list.className = 'cdt-pop-list';
+    profiles.items.forEach(profile => {
+      list.appendChild(buildProfileItem(profile, profile.id === profiles.activeId, profiles));
+    });
+    pop.appendChild(list);
+
+    // Editor (if editing)
+    if (editingProfileId) {
+      const editProfile = editingProfileId === '__new__'
+        ? { id: '__new__', name: '', instruction: '' }
+        : profiles.items.find(p => p.id === editingProfileId);
+      if (editProfile) pop.appendChild(buildEditor(editProfile));
+    }
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'cdt-pop-footer';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'cdt-add-btn';
+    addBtn.type = 'button';
+    addBtn.textContent = profiles.items.length >= MAX_PROFILES
+      ? 'Maximum ' + MAX_PROFILES + ' profiles reached'
+      : '+ New Profile';
+    addBtn.disabled = profiles.items.length >= MAX_PROFILES;
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editingProfileId = '__new__';
+      openPopover();
+    });
+    footer.appendChild(addBtn);
+    pop.appendChild(footer);
+
+    (document.body || document.documentElement).appendChild(pop);
+
+    // Click outside to close
+    setTimeout(() => {
+      const outsideHandler = (e) => {
+        const popEl = document.getElementById('claude-dt-popover');
+        const chipEl = document.getElementById('claude-dt-chip');
+        if (popEl && !popEl.contains(e.target) && chipEl && !chipEl.contains(e.target)) {
+          closePopover();
+          document.removeEventListener('click', outsideHandler, true);
+        }
+      };
+      document.addEventListener('click', outsideHandler, true);
+    }, 0);
+
+    // Escape to close
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        closePopover();
+        document.removeEventListener('keydown', escHandler, true);
+      }
+    };
+    document.addEventListener('keydown', escHandler, true);
+  };
+
+  const buildProfileItem = (profile, isActive, profiles) => {
+    const item = document.createElement('div');
+    const isEditing = editingProfileId === profile.id;
+    item.className = 'cdt-p-item' + (isActive ? ' active' : '') + (isEditing ? ' editing' : '');
+
+    const radio = document.createElement('span');
+    radio.className = 'cdt-p-radio';
+
+    const info = document.createElement('div');
+    info.className = 'cdt-p-info';
+
+    const name = document.createElement('div');
+    name.className = 'cdt-p-name';
+    name.textContent = profile.name || '(untitled)';
+
+    const preview = document.createElement('div');
+    preview.className = 'cdt-p-preview';
+    preview.textContent = (profile.instruction || '').slice(0, 80) + (profile.instruction.length > 80 ? '...' : '');
+
+    info.append(name, preview);
+
+    const actions = document.createElement('div');
+    actions.className = 'cdt-p-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'cdt-p-btn';
+    editBtn.type = 'button';
+    editBtn.textContent = '\u270E';
+    editBtn.title = 'Edit profile';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Switch active to the profile being edited so chip, list highlight,
+      // and editor all agree on which profile the user is working with.
+      if (profiles.activeId !== profile.id) {
+        const updated = { ...profiles, activeId: profile.id };
+        setProfiles(updated);
+      }
+      editingProfileId = profile.id;
+      openPopover();
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'cdt-p-btn delete';
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = '\u2715';
+    deleteBtn.title = 'Delete profile';
+    if (profiles.items.length <= 1) {
+      deleteBtn.style.opacity = '0.2';
+      deleteBtn.style.cursor = 'default';
+      deleteBtn.title = 'Cannot delete the last profile';
+    } else {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const updated = { ...profiles };
+        updated.items = updated.items.filter(p => p.id !== profile.id);
+        if (updated.activeId === profile.id) {
+          updated.activeId = updated.items[0].id;
+        }
+        setProfiles(updated);
+        openPopover();
+      });
+    }
+
+    actions.append(editBtn, deleteBtn);
+    item.append(radio, info, actions);
+
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isActive) return;
+      const updated = { ...profiles, activeId: profile.id };
+      setProfiles(updated);
+      openPopover();
+    });
+
+    return item;
+  };
+
+  const buildEditor = (profile) => {
+    const isNew = profile.id === '__new__';
+    const editor = document.createElement('div');
+    editor.className = 'cdt-editor';
+
+    const editorTitle = document.createElement('div');
+    editorTitle.className = 'cdt-editor-title';
+    editorTitle.textContent = isNew ? 'Create New Profile' : 'Edit Profile';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Profile name (e.g., Email Writing)';
+    nameInput.value = profile.name;
+    nameInput.maxLength = 40;
+
+    const instructionInput = document.createElement('textarea');
+    instructionInput.placeholder = 'Instruction to append to every message...';
+    instructionInput.value = profile.instruction;
+
+    const btns = document.createElement('div');
+    btns.className = 'cdt-editor-btns';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'cdt-btn cdt-btn-cancel';
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editingProfileId = null;
+      openPopover();
+    });
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'cdt-btn cdt-btn-save';
+    saveBtn.type = 'button';
+    saveBtn.textContent = isNew ? 'Create' : 'Save';
+    saveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = nameInput.value.trim();
+      const instruction = instructionInput.value.trim();
+      if (!name || !instruction) return;
+
+      const profiles = getProfiles();
+      if (isNew) {
+        const newProfile = { id: generateId(), name, instruction };
+        profiles.items.push(newProfile);
+        profiles.activeId = newProfile.id;
+      } else {
+        const existing = profiles.items.find(p => p.id === profile.id);
+        if (existing) {
+          existing.name = name;
+          existing.instruction = instruction;
+        }
+      }
+      setProfiles(profiles);
+      editingProfileId = null;
+      openPopover();
+    });
+
+    btns.append(cancelBtn, saveBtn);
+    editor.append(editorTitle, nameInput, instructionInput, btns);
+
+    setTimeout(() => nameInput.focus(), 0);
+
+    return editor;
+  };
+
+  // ── MutationObserver for live sync ─────────────────────────────────
+
+  const observer = new MutationObserver(() => {
     const chip = document.getElementById('claude-dt-chip');
     if (chip) updateChipVisual(chip);
+    if (isPopoverOpen()) openPopover();
   });
-  chipObserver.observe(document.documentElement, {
+  observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-claude-dt-enabled'],
+    attributeFilter: ['data-claude-dt-enabled', 'data-claude-dt-profiles'],
   });
+
+  // ── Editor + Fetch (core send logic — unchanged) ───────────────────
 
   const findEditor = () => {
     return document.querySelector('div.ProseMirror[contenteditable="true"]')
@@ -212,14 +650,12 @@
     return true;
   };
 
-  // Capture-phase click on send button
   document.addEventListener('click', (e) => {
     const btn = e.target?.closest?.('button[aria-label*="Send" i], button[data-testid*="send" i]');
     if (!btn) return;
     appendInstructionToEditor();
   }, true);
 
-  // Capture-phase Enter inside the editor
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
     const editor = e.target?.closest?.('[contenteditable="true"]');
@@ -227,8 +663,6 @@
     appendInstructionToEditor();
   }, true);
 
-  // Fetch fallback: if the editor-append missed for any reason, still
-  // mutate the outgoing request body so the instruction reaches Claude.
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
     const [resource, config] = args;
@@ -264,12 +698,9 @@
         }
 
         config.body = JSON.stringify(body);
-      } catch (e) {
-        // Don't break the request if parsing fails
-      }
+      } catch (e) {}
     }
 
     return originalFetch.apply(this, [resource, config]);
   };
-
 })();

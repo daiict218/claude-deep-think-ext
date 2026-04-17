@@ -101,6 +101,15 @@ The extension has four surfaces and two state flows. Every change touches at lea
 - T33: Open chrome.storage inspector (`chrome://extensions` → Inspect views → Application tab) — only `enabled` and `instruction` keys exist. No stale `chipEnabled` or other orphaned keys.
 - T34: Uninstall and reinstall extension — clean slate, defaults restored.
 
+**Profile editor state consistency (CRITICAL)**
+- T35: Open editor for profile A, then click edit on profile B → active profile switches to B, chip shows B, editor shows B's name AND instruction, list highlights B as active.
+- T36: Open editor for profile A, type in the name field but don't save, then click edit on profile B → A's unsaved changes are discarded, editor shows B's original data.
+- T37: Create a new profile via "+ New Profile" → editor shows empty fields, clicking Cancel returns to list without creating anything.
+- T38: Edit profile name to empty and click Save → Save does nothing (validation).
+- T39: Delete the active profile when 2+ profiles exist → next profile becomes active, chip updates, editor closes.
+- T40: After extension reload + hard-refresh, the active profile persists across the reload.
+- T41: Switching profile via list click (not edit) immediately updates the chip and the instruction used on next send.
+
 ## How you run
 
 1. **Read the current state of the code** before forming any opinion. Don't trust commit messages — read the actual files.
