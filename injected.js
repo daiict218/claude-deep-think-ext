@@ -53,8 +53,6 @@
       #claude-dt-widget {
         position: fixed; z-index: 2147483647;
         right: 20px; bottom: 120px;
-        display: flex; flex-direction: column;
-        align-items: stretch;
         max-width: 480px;
       }
 
@@ -120,6 +118,9 @@
 
       /* ── Description bar below chip ── */
       #claude-dt-desc {
+        position: absolute;
+        top: calc(100% - 1px);
+        left: 0; right: 0;
         padding: 8px 16px;
         background: #16162b;
         border: 1px solid #333;

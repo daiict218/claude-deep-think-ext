@@ -72,7 +72,10 @@ Setting one element's width from another's `getBoundingClientRect()` in JS cause
 ### DL6 — Stop incrementally patching. Redesign when the foundation is wrong.
 Multiple rounds of "+2px here, different color there" made things worse, not better. The user correctly called this out. **Rule:** if the user rejects a design twice, the problem is structural, not parametric. Step back, identify what's fundamentally wrong (wrong font? wrong layout? wrong affordance?), and rebuild that part from scratch. Three small patches ≠ one correct design.
 
-### DL7 — Font sizes below 12px are hard to read. Period.
+### DL7 — Expanding content goes downward, never upward.
+When a UI element anchored to the bottom of the viewport gains new content (a description bar, a dropdown, a tooltip), the new content must expand **downward** — not push the anchor element upward. Upward jumps feel unnatural and disorienting. **Rule:** if the widget is `position: fixed; bottom: Npx`, any expandable child must be `position: absolute; top: 100%` so it grows downward from the anchor without moving it. Never use flex-direction column in a bottom-anchored container for expandable content — it grows the container upward.
+
+### DL8 — Font sizes below 12px are hard to read. Period.
 Multiple elements shipped at 9px, 10px, 11px. The user called them "so small." **Rule:** minimum font size is 12px for any text the user needs to read. 11px is acceptable only for non-essential metadata (counters, timestamps). 10px and below is reserved for `letter-spacing` labels that are uppercase and short (e.g., "PROMPT"). Never set body text below 12px.
 
 ## Output format
