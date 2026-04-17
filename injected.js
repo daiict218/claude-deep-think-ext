@@ -52,9 +52,10 @@
       /* ── Widget container ── */
       #claude-dt-widget {
         position: fixed; z-index: 2147483647;
-        right: 20px; bottom: 96px;
+        right: 20px; bottom: 120px;
         display: flex; flex-direction: column;
         align-items: stretch;
+        max-width: 480px;
       }
 
       /* ── Chip: two-zone layout ── */
@@ -127,9 +128,6 @@
         font: 12px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         color: #ccc;
         text-align: left;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         transition: opacity .2s;
         display: flex; align-items: center; gap: 8px;
@@ -142,8 +140,11 @@
         border-radius: 4px;
       }
       #claude-dt-desc .cdt-desc-text {
-        color: #ccc; overflow: hidden; text-overflow: ellipsis;
-        white-space: nowrap; font-style: italic;
+        color: #ccc; font-style: italic;
+        overflow: hidden; text-overflow: ellipsis;
+        display: -webkit-box; -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical; white-space: normal;
+        line-height: 1.5;
       }
       #claude-dt-desc.hidden { opacity: 0; pointer-events: none; }
       #claude-dt-chip .cdt-on-off {
