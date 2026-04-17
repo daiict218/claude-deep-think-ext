@@ -115,23 +115,33 @@
       #claude-dt-desc {
         position: fixed; z-index: 2147483646;
         right: 20px; bottom: 68px;
-        /* width is synced to chip width via JS */
-        padding: 7px 16px;
+        padding: 8px 16px;
         background: #16162b;
         border: 1px solid #333;
         border-top: none;
         border-radius: 0 0 14px 14px;
-        font: italic 12px/1.4 'Georgia', 'Times New Roman', serif;
-        color: #b0b0cc;
-        text-align: center;
+        font: 12px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #ccc;
+        text-align: left;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         transition: opacity .2s;
-        letter-spacing: .2px;
+        display: flex; align-items: center; gap: 8px;
       }
-      #claude-dt-desc.hidden { opacity: 0; }
+      #claude-dt-desc .cdt-desc-label {
+        font-size: 9px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .8px; color: #4ade80;
+        flex-shrink: 0; padding: 2px 6px;
+        background: rgba(74,222,128,0.1);
+        border-radius: 4px;
+      }
+      #claude-dt-desc .cdt-desc-text {
+        color: #ccc; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; font-style: italic;
+      }
+      #claude-dt-desc.hidden { opacity: 0; pointer-events: none; }
       #claude-dt-chip .cdt-on-off {
         font-size: 13px; font-weight: 700; color: #4ade80;
         letter-spacing: .3px; min-width: 26px; text-align: center;
@@ -298,11 +308,19 @@
     const descEl = document.getElementById('claude-dt-desc');
     if (descEl) {
       if (active && on) {
+        while (descEl.firstChild) descEl.firstChild.remove();
+
+        const label = document.createElement('span');
+        label.className = 'cdt-desc-label';
+        label.textContent = 'PROMPT';
+
+        const text = document.createElement('span');
+        text.className = 'cdt-desc-text';
         const instr = active.instruction || '';
-        const preview = instr.slice(0, 100);
-        descEl.textContent = '\u201C' + preview + (preview.length < instr.length ? '...' : '') + '\u201D';
+        text.textContent = instr.slice(0, 120) + (instr.length > 120 ? '...' : '');
+
+        descEl.append(label, text);
         descEl.classList.remove('hidden');
-        // Sync width to chip
         const chipRect = chip.getBoundingClientRect();
         descEl.style.width = chipRect.width + 'px';
         chip.style.borderRadius = '14px 14px 0 0';
