@@ -84,28 +84,32 @@
         max-width: 160px; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; line-height: 1.2;
       }
-      #claude-dt-chip .cdt-switch-label {
-        font-size: 12px; font-weight: 600; color: #4ade80;
-        padding: 4px 10px; border-radius: 6px;
-        background: rgba(74, 222, 128, 0.1);
-        border: 1px solid rgba(74, 222, 128, 0.25);
-        white-space: nowrap; flex-shrink: 0;
-        transition: background .15s, color .15s;
-        display: flex; align-items: center; gap: 5px;
+      #claude-dt-chip .cdt-circles {
+        display: flex; align-items: center; gap: 4px;
+        border-left: 1px solid #333; padding-left: 10px; margin-left: 2px;
       }
-      #claude-dt-chip .cdt-switch-label::after {
-        content: '';
-        width: 0; height: 0;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 5px solid #4ade80;
-        transition: transform .2s;
+      #claude-dt-chip .cdt-circle {
+        width: 26px; height: 26px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 9px; font-weight: 700; letter-spacing: .3px;
+        color: #999; background: #222240;
+        cursor: pointer; transition: all .15s; flex-shrink: 0;
+        border: 2px solid transparent; text-transform: uppercase;
       }
-      #claude-dt-chip .cdt-switch-label.open::after { transform: rotate(180deg); }
-      #claude-dt-chip .cdt-switch-label:hover {
-        background: rgba(74, 222, 128, 0.2);
-        color: #6cf5a0;
+      #claude-dt-chip .cdt-circle:hover { background: #2a2a50; color: #ddd; transform: scale(1.1); }
+      #claude-dt-chip .cdt-circle.active {
+        background: rgba(74, 222, 128, 0.15); color: #4ade80;
+        border-color: #4ade80;
       }
+      #claude-dt-chip .cdt-circle.active:hover { background: rgba(74, 222, 128, 0.25); }
+      #claude-dt-chip .cdt-gear {
+        width: 26px; height: 26px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; color: #777; background: transparent;
+        cursor: pointer; transition: all .15s; flex-shrink: 0;
+        border: none; margin-left: 2px;
+      }
+      #claude-dt-chip .cdt-gear:hover { color: #fff; background: #2a2a50; }
       #claude-dt-chip .cdt-on-off {
         font-size: 13px; font-weight: 700; color: #4ade80;
         letter-spacing: .3px; min-width: 26px; text-align: center;
@@ -248,6 +252,13 @@
 
   // ── Chip ───────────────────────────────────────────────────────────
 
+  const getInitials = (name) => {
+    if (!name) return '??';
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
   const updateChipVisual = (chip) => {
     const on = isEnabled();
     chip.classList.toggle('off', !on);
@@ -260,6 +271,33 @@
 
     const onOffEl = chip.querySelector('.cdt-on-off');
     if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
+
+    // Rebuild profile circles
+    const circlesEl = chip.querySelector('.cdt-circles');
+    if (circlesEl && profiles.items.length > 1) {
+      while (circlesEl.firstChild) circlesEl.firstChild.remove();
+      profiles.items.forEach(p => {
+        const circle = document.createElement('span');
+        circle.className = 'cdt-circle' + (p.id === profiles.activeId ? ' active' : '');
+        circle.textContent = getInitials(p.name);
+        circle.title = p.name;
+        circle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          if (p.id !== profiles.activeId) {
+            const updated = { ...profiles, activeId: p.id };
+            setProfiles(updated);
+          }
+        });
+        circlesEl.appendChild(circle);
+      });
+      circlesEl.style.display = '';
+    } else if (circlesEl) {
+      // Only 1 profile — hide circles, no need to switch
+      while (circlesEl.firstChild) circlesEl.firstChild.remove();
+      circlesEl.style.display = 'none';
+    }
   };
 
   const ensureChip = () => {
@@ -283,21 +321,34 @@
       profileLabel.className = 'cdt-profile-label';
       profileLabel.textContent = '';
 
-      const switchLabel = document.createElement('span');
-      switchLabel.className = 'cdt-switch-label';
-      switchLabel.textContent = 'Switch';
+      const circles = document.createElement('span');
+      circles.className = 'cdt-circles';
 
-      zoneProfile.append(dot, profileLabel, switchLabel);
-      zoneProfile.addEventListener('click', (e) => {
+      const gear = document.createElement('span');
+      gear.className = 'cdt-gear';
+      gear.textContent = '\u2699';
+      gear.title = 'Manage profiles';
+      gear.setAttribute('role', 'button');
+      gear.setAttribute('aria-label', 'Manage prompt profiles');
+      gear.tabIndex = 0;
+      gear.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         togglePopover();
       });
+      gear.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePopover(); }
+      });
+
+      zoneProfile.append(dot, profileLabel, circles, gear);
       zoneProfile.addEventListener('mousedown', (e) => e.stopPropagation());
-      zoneProfile.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+      // Clicking the zone background (not a circle or gear) also opens popover
+      zoneProfile.addEventListener('click', (e) => {
+        if (e.target === zoneProfile || e.target === dot || e.target === profileLabel) {
           e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
           togglePopover();
         }
       });
@@ -381,8 +432,8 @@
     const pop = document.getElementById('claude-dt-popover');
     if (pop) pop.remove();
     editingProfileId = null;
-    const sl = document.querySelector('#claude-dt-chip .cdt-switch-label');
-    if (sl) sl.classList.remove('open');
+    const gearEl = document.querySelector('#claude-dt-chip .cdt-gear');
+    if (gearEl) gearEl.style.color = '';
   };
 
   const togglePopover = () => {
@@ -393,8 +444,8 @@
   const openPopover = () => {
     const existing = document.getElementById('claude-dt-popover');
     if (existing) existing.remove();
-    const sl = document.querySelector('#claude-dt-chip .cdt-switch-label');
-    if (sl) sl.classList.add('open');
+    const gearEl = document.querySelector('#claude-dt-chip .cdt-gear');
+    if (gearEl) gearEl.style.color = '#4ade80';
 
     const profiles = getProfiles();
     const pop = document.createElement('div');
