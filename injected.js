@@ -79,6 +79,27 @@
         transition: background .12s;
       }
       #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
+      #claude-dt-chip .cdt-minimize {
+        width: 20px; height: 20px; border: none; border-radius: 50%;
+        background: transparent; color: #666; cursor: pointer;
+        font: 700 16px/20px -apple-system, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        transition: .15s; margin-left: -4px;
+      }
+      #claude-dt-chip .cdt-minimize:hover { color: #fff; background: #2a2a50; }
+
+      /* ── Minimized state ── */
+      #claude-dt-mini {
+        width: 38px; height: 38px; border-radius: 50%;
+        background: #16162b; border: 2px solid #4ade80;
+        color: #4ade80; cursor: pointer;
+        font: 700 12px/38px -apple-system, sans-serif;
+        text-align: center; user-select: none;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+        transition: transform .15s, background .15s;
+      }
+      #claude-dt-mini:hover { transform: scale(1.1); background: #1f1f3a; }
+      #claude-dt-mini.off { border-color: #e94560; color: #e94560; }
       #claude-dt-chip .cdt-zone-toggle:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
       #claude-dt-chip .cdt-dot {
         width: 10px; height: 10px; border-radius: 50%;
@@ -437,7 +458,20 @@
       const sw = document.createElement('span');
       sw.className = 'cdt-switch';
 
-      zoneToggle.append(onOff, sw);
+      const minimizeBtn = document.createElement('button');
+      minimizeBtn.className = 'cdt-minimize';
+      minimizeBtn.type = 'button';
+      minimizeBtn.textContent = '\u2212';
+      minimizeBtn.title = 'Minimize';
+      minimizeBtn.setAttribute('aria-label', 'Minimize Deep Think chip');
+      minimizeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setMinimized(true);
+      });
+
+      zoneToggle.append(onOff, sw, minimizeBtn);
       zoneToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -468,9 +502,59 @@
     updateChipVisual(chip);
   };
 
-  setInterval(ensureChip, 2000);
+  // ── Minimize / Expand ──
+
+  const isMinimized = () => {
+    try { return localStorage.getItem('claude-dt-minimized') === '1'; } catch { return false; }
+  };
+
+  const setMinimized = (val) => {
+    try { localStorage.setItem('claude-dt-minimized', val ? '1' : '0'); } catch {}
+    applyMinimizedState();
+  };
+
+  const applyMinimizedState = () => {
+    const widget = document.getElementById('claude-dt-widget');
+    const mini = document.getElementById('claude-dt-mini');
+
+    if (isMinimized()) {
+      if (widget) widget.style.display = 'none';
+      if (!mini) {
+        const dot = document.createElement('div');
+        dot.id = 'claude-dt-mini';
+        dot.textContent = 'DT';
+        dot.title = 'Expand Deep Think';
+        dot.setAttribute('role', 'button');
+        dot.setAttribute('aria-label', 'Expand Deep Think chip');
+        dot.tabIndex = 0;
+        dot.classList.toggle('off', !isEnabled());
+        dot.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMinimized(false);
+        });
+        dot.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMinimized(false); }
+        });
+        // Position same as widget
+        dot.style.cssText = 'position:fixed;z-index:2147483647;right:20px;bottom:120px;';
+        (document.body || document.documentElement).appendChild(dot);
+      } else {
+        mini.classList.toggle('off', !isEnabled());
+      }
+    } else {
+      if (mini) mini.remove();
+      if (widget) widget.style.display = '';
+      ensureChip();
+    }
+  };
+
+  setInterval(() => {
+    if (isMinimized()) applyMinimizedState();
+    else ensureChip();
+  }, 2000);
   const bootChip = () => {
-    if (document.body) ensureChip();
+    if (document.body) { applyMinimizedState(); if (!isMinimized()) ensureChip(); }
     else setTimeout(bootChip, 100);
   };
   bootChip();
