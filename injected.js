@@ -374,11 +374,13 @@
         text.textContent = instr.slice(0, 120) + (instr.length > 120 ? '...' : '');
 
         descEl.append(label, text);
+        descEl.style.display = '';
         dropdown.style.display = '';
         chip.style.borderRadius = '14px 14px 0 0';
       } else {
-        dropdown.style.display = 'none';
-        chip.style.borderRadius = '14px';
+        descEl.style.display = 'none';
+        dropdown.style.display = '';
+        chip.style.borderRadius = '14px 14px 0 0';
       }
     }
 
