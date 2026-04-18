@@ -53,7 +53,7 @@
       #claude-dt-widget {
         position: fixed; z-index: 2147483647;
         right: 20px; bottom: 120px;
-        max-width: 480px;
+        max-width: min(520px, calc(100vw - 40px));
       }
 
       /* ── Chip: two-zone layout ── */
@@ -77,14 +77,16 @@
         display: flex; align-items: center; gap: 8px;
         padding: 10px 14px; cursor: pointer;
         transition: background .12s;
+        flex-shrink: 0;
       }
       #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
       #claude-dt-chip .cdt-minimize {
-        width: 20px; height: 20px; border: none; border-radius: 50%;
-        background: transparent; color: #666; cursor: pointer;
-        font: 700 16px/20px -apple-system, sans-serif;
-        display: flex; align-items: center; justify-content: center;
-        transition: .15s; margin-left: -4px;
+        border: none; border-radius: 6px; border-left: 1px solid #333;
+        background: transparent; color: #888; cursor: pointer;
+        font: 600 10px/1 -apple-system, sans-serif;
+        padding: 10px 10px;
+        transition: .15s; white-space: nowrap;
+        letter-spacing: .3px;
       }
       #claude-dt-chip .cdt-minimize:hover { color: #fff; background: #2a2a50; }
 
@@ -125,7 +127,7 @@
       }
       #claude-dt-chip .cdt-profile-label {
         font-size: 14px; font-weight: 600; color: #fff;
-        max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+        max-width: 120px; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; line-height: 1.2;
       }
       #claude-dt-chip .cdt-circles {
@@ -497,8 +499,8 @@
       const minimizeBtn = document.createElement('button');
       minimizeBtn.className = 'cdt-minimize';
       minimizeBtn.type = 'button';
-      minimizeBtn.textContent = '\u2212';
-      minimizeBtn.title = 'Minimize';
+      minimizeBtn.textContent = 'HIDE';
+      minimizeBtn.title = 'Minimize to a small dot';
       minimizeBtn.setAttribute('aria-label', 'Minimize Deep Think chip');
       minimizeBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -507,7 +509,7 @@
         setMinimized(true);
       });
 
-      zoneToggle.append(onOff, sw, minimizeBtn);
+      zoneToggle.append(onOff, sw);
       zoneToggle.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -524,7 +526,7 @@
         }
       });
 
-      chip.append(zoneProfile, zoneToggle);
+      chip.append(zoneProfile, zoneToggle, minimizeBtn);
       widget.appendChild(chip);
     }
 
