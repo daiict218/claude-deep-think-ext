@@ -699,11 +699,12 @@
   };
 
   setInterval(() => {
+    injectStyles();
     if (isMinimized()) applyMinimizedState();
     else ensureChip();
   }, 2000);
   const bootChip = () => {
-    if (document.body) { applyMinimizedState(); if (!isMinimized()) ensureChip(); }
+    if (document.body) { injectStyles(); applyMinimizedState(); if (!isMinimized()) ensureChip(); }
     else setTimeout(bootChip, 100);
   };
   bootChip();
