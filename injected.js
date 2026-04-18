@@ -82,9 +82,12 @@
       #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
       #claude-dt-hide {
         text-align: center; padding: 6px 0;
+        background: #16162b;
+        border: 1px solid #333; border-top: none;
+        border-radius: 0 0 14px 14px;
       }
       #claude-dt-hide button {
-        background: none; border: none; color: #666;
+        background: none; border: none; color: #777;
         font: 500 11px -apple-system, sans-serif; cursor: pointer;
         padding: 4px 12px; border-radius: 6px;
         transition: .15s; letter-spacing: .3px;
@@ -159,15 +162,17 @@
       #claude-dt-chip .cdt-gear:hover { color: #fff; background: #2a2a50; }
 
       /* ── Description bar below chip ── */
-      #claude-dt-desc {
+      #claude-dt-dropdown {
         position: absolute;
         top: calc(100% - 1px);
         left: 0; right: 0;
+        display: flex; flex-direction: column;
+      }
+      #claude-dt-desc {
         padding: 8px 16px;
         background: #16162b;
         border: 1px solid #333;
         border-top: none;
-        border-radius: 0 0 14px 14px;
         font: 12px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         color: #ccc;
         text-align: left;
@@ -352,9 +357,10 @@
     const onOffEl = chip.querySelector('.cdt-on-off');
     if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
 
-    // Update description bar — match chip width, show instruction preview
+    // Update dropdown (desc + hide bar)
+    const dropdown = document.getElementById('claude-dt-dropdown');
     const descEl = document.getElementById('claude-dt-desc');
-    if (descEl) {
+    if (descEl && dropdown) {
       if (active && on) {
         while (descEl.firstChild) descEl.firstChild.remove();
 
@@ -368,10 +374,10 @@
         text.textContent = instr.slice(0, 120) + (instr.length > 120 ? '...' : '');
 
         descEl.append(label, text);
-        descEl.classList.remove('hidden');
+        dropdown.style.display = '';
         chip.style.borderRadius = '14px 14px 0 0';
       } else {
-        descEl.classList.add('hidden');
+        dropdown.style.display = 'none';
         chip.style.borderRadius = '14px';
       }
     }
@@ -520,15 +526,14 @@
       widget.appendChild(chip);
     }
 
-    // Ensure description bar exists inside widget
-    if (!document.getElementById('claude-dt-desc')) {
+    // Ensure dropdown container (desc + hide) exists inside widget
+    if (!document.getElementById('claude-dt-dropdown')) {
+      const dropdown = document.createElement('div');
+      dropdown.id = 'claude-dt-dropdown';
+
       const desc = document.createElement('div');
       desc.id = 'claude-dt-desc';
-      widget.appendChild(desc);
-    }
 
-    // Ensure HIDE bar exists inside widget
-    if (!document.getElementById('claude-dt-hide')) {
       const hideBar = document.createElement('div');
       hideBar.id = 'claude-dt-hide';
       const hideBtn = document.createElement('button');
@@ -541,7 +546,9 @@
         setMinimized(true);
       });
       hideBar.appendChild(hideBtn);
-      widget.appendChild(hideBar);
+
+      dropdown.append(desc, hideBar);
+      widget.appendChild(dropdown);
     }
 
     updateChipVisual(chip);
