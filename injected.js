@@ -444,6 +444,8 @@
       zoneProfile.addEventListener('mousedown', (e) => e.stopPropagation());
       // Clicking the zone background (not a circle or gear) also opens popover
       zoneProfile.addEventListener('click', (e) => {
+        // Don't open popover if we just finished dragging
+        if (_dragState?.dragging) return;
         if (e.target === zoneProfile || e.target === dot || e.target === profileLabel) {
           e.preventDefault();
           e.stopPropagation();
@@ -544,20 +546,22 @@
   };
 
   const makeDraggable = (el) => {
+    // Capture phase so it fires BEFORE any child's stopPropagation
     el.addEventListener('mousedown', (e) => {
       // Don't drag from buttons, inputs, or interactive children
       if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-minimize')) return;
 
+      // Convert right/bottom positioning to left/top before dragging
+      const rect = el.getBoundingClientRect();
       _dragState = {
         el,
         startX: e.clientX,
         startY: e.clientY,
-        origLeft: el.offsetLeft,
-        origTop: el.offsetTop,
+        origLeft: rect.left,
+        origTop: rect.top,
         dragging: false,
       };
-      e.preventDefault();
-    });
+    }, true);
 
     document.addEventListener('mousemove', (e) => {
       if (!_dragState || _dragState.el !== el) return;
@@ -570,6 +574,7 @@
         el.classList.add('dragging');
       }
 
+      e.preventDefault();
       const newX = Math.max(0, Math.min(_dragState.origLeft + dx, window.innerWidth - el.offsetWidth));
       const newY = Math.max(0, Math.min(_dragState.origTop + dy, window.innerHeight - el.offsetHeight));
       el.style.left = newX + 'px';
@@ -580,8 +585,9 @@
 
     document.addEventListener('mouseup', () => {
       if (!_dragState || _dragState.el !== el) return;
+      const wasDragging = _dragState.dragging;
       el.classList.remove('dragging');
-      if (_dragState.dragging) {
+      if (wasDragging) {
         savePosition(el.offsetLeft, el.offsetTop);
       }
       _dragState = null;
