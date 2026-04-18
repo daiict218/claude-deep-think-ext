@@ -114,7 +114,10 @@ Setting one element's width from another's `getBoundingClientRect()` causes a re
 ### L9 — Push back on bad design before implementing it.
 Multiple rounds of bad contrast, wrong fonts, and tiny chevrons shipped because Pooja implemented exactly what was specced without questioning whether it looked right. The user explicitly said "you're a developer but you can think through design principles." **Rule:** before implementing a visual change, check: (a) does every text/bg pair pass WCAG AA contrast? (b) is the font family consistent with the rest of the UI? (c) is the primary action reachable in 1 click? If any answer is no, push back on Designer before writing code.
 
-### L10 — An agent that's disabled and an agent that's silently broken look identical.
+### L10 — Never push directly to main. Ever.
+The open-source readiness commit was pushed directly to main, bypassing the PR → QA → Eli review workflow that Pooja herself wrote. On a public repo for an extension that intercepts user messages, this is a supply chain risk. **Rule:** every change to main goes through a feature branch → PR → QA static checks → Eli security review → merge. No exceptions, including "it's just a README" or "it's not a code change." Branch protection must be enabled on GitHub to enforce this structurally, not just by discipline.
+
+### L11 — An agent that's disabled and an agent that's silently broken look identical.
 
 When the Save button was CSP-blocked, it gave zero feedback — no toast, no button state change, no console error in the obvious place. The user correctly called this out as terrible UX. Every interactive control must produce feedback within 100ms: button label swap, toast, border pulse, status line. Silence is a bug, not a feature.
 
