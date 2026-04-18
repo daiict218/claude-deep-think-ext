@@ -524,6 +524,8 @@
 
       chip.append(zoneProfile, zoneToggle);
       widget.appendChild(chip);
+      // Defer first visual update so DOM has rendered and profiles are loaded
+      requestAnimationFrame(() => updateChipVisual(chip));
     }
 
     // Ensure dropdown container (desc + hide) exists inside widget
@@ -578,13 +580,17 @@
   const applyPosition = (el) => {
     const pos = getSavedPosition();
     if (pos) {
-      // Clamp to viewport
-      const maxX = window.innerWidth - 40;
-      const maxY = window.innerHeight - 40;
-      el.style.left = Math.max(0, Math.min(pos.x, maxX)) + 'px';
-      el.style.top = Math.max(0, Math.min(pos.y, maxY)) + 'px';
-      el.style.right = 'auto';
-      el.style.bottom = 'auto';
+      // Defer to next frame so element has dimensions
+      requestAnimationFrame(() => {
+        const w = el.offsetWidth || 200;
+        const h = el.offsetHeight || 50;
+        const maxX = Math.max(0, window.innerWidth - w);
+        const maxY = Math.max(0, window.innerHeight - h);
+        el.style.left = Math.max(0, Math.min(pos.x, maxX)) + 'px';
+        el.style.top = Math.max(0, Math.min(pos.y, maxY)) + 'px';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+      });
     }
   };
 
@@ -618,8 +624,10 @@
       }
 
       e.preventDefault();
-      const newX = Math.max(0, Math.min(_dragState.origLeft + dx, window.innerWidth - el.offsetWidth));
-      const newY = Math.max(0, Math.min(_dragState.origTop + dy, window.innerHeight - el.offsetHeight));
+      const w = el.offsetWidth || 200;
+      const h = el.offsetHeight || 50;
+      const newX = Math.max(0, Math.min(_dragState.origLeft + dx, window.innerWidth - w));
+      const newY = Math.max(0, Math.min(_dragState.origTop + dy, window.innerHeight - h));
       el.style.left = newX + 'px';
       el.style.top = newY + 'px';
       el.style.right = 'auto';
@@ -697,6 +705,19 @@
     else setTimeout(bootChip, 100);
   };
   bootChip();
+
+  // Re-clamp to viewport on resize
+  window.addEventListener('resize', () => {
+    const el = document.getElementById('claude-dt-widget') || document.getElementById('claude-dt-mini');
+    if (el && el.style.left && el.style.left !== 'auto') {
+      const w = el.offsetWidth || 200;
+      const h = el.offsetHeight || 50;
+      const x = Math.max(0, Math.min(el.offsetLeft, window.innerWidth - w));
+      const y = Math.max(0, Math.min(el.offsetTop, window.innerHeight - h));
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+    }
+  });
 
   // Hotkey: Cmd/Ctrl+Shift+D
   document.addEventListener('keydown', (e) => {
