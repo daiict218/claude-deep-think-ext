@@ -100,6 +100,12 @@
       }
       #claude-dt-mini:hover { transform: scale(1.1); background: #1f1f3a; }
       #claude-dt-mini.off { border-color: #e94560; color: #e94560; }
+      #claude-dt-widget.dragging, #claude-dt-mini.dragging {
+        opacity: 0.8; cursor: grabbing !important;
+      }
+      #claude-dt-widget { cursor: default; }
+      #claude-dt-chip .cdt-zone-profile { cursor: grab; }
+      #claude-dt-chip .cdt-zone-profile:active { cursor: grabbing; }
       #claude-dt-chip .cdt-zone-toggle:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
       #claude-dt-chip .cdt-dot {
         width: 10px; height: 10px; border-radius: 50%;
@@ -391,6 +397,8 @@
       widget = document.createElement('div');
       widget.id = 'claude-dt-widget';
       (document.body || document.documentElement).appendChild(widget);
+      applyPosition(widget);
+      makeDraggable(widget);
     }
 
     let chip = document.getElementById('claude-dt-chip');
@@ -502,6 +510,84 @@
     updateChipVisual(chip);
   };
 
+  // ── Drag ───────────────────────────────────────────────────────
+
+  const DRAG_THRESHOLD = 5;
+  let _dragState = null;
+
+  const getSavedPosition = () => {
+    try {
+      const raw = localStorage.getItem('claude-dt-position');
+      if (raw) {
+        const pos = JSON.parse(raw);
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') return pos;
+      }
+    } catch {}
+    return null;
+  };
+
+  const savePosition = (x, y) => {
+    try { localStorage.setItem('claude-dt-position', JSON.stringify({ x, y })); } catch {}
+  };
+
+  const applyPosition = (el) => {
+    const pos = getSavedPosition();
+    if (pos) {
+      // Clamp to viewport
+      const maxX = window.innerWidth - 40;
+      const maxY = window.innerHeight - 40;
+      el.style.left = Math.max(0, Math.min(pos.x, maxX)) + 'px';
+      el.style.top = Math.max(0, Math.min(pos.y, maxY)) + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    }
+  };
+
+  const makeDraggable = (el) => {
+    el.addEventListener('mousedown', (e) => {
+      // Don't drag from buttons, inputs, or interactive children
+      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-minimize')) return;
+
+      _dragState = {
+        el,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: el.offsetLeft,
+        origTop: el.offsetTop,
+        dragging: false,
+      };
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!_dragState || _dragState.el !== el) return;
+      const dx = e.clientX - _dragState.startX;
+      const dy = e.clientY - _dragState.startY;
+
+      if (!_dragState.dragging) {
+        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+        _dragState.dragging = true;
+        el.classList.add('dragging');
+      }
+
+      const newX = Math.max(0, Math.min(_dragState.origLeft + dx, window.innerWidth - el.offsetWidth));
+      const newY = Math.max(0, Math.min(_dragState.origTop + dy, window.innerHeight - el.offsetHeight));
+      el.style.left = newX + 'px';
+      el.style.top = newY + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!_dragState || _dragState.el !== el) return;
+      el.classList.remove('dragging');
+      if (_dragState.dragging) {
+        savePosition(el.offsetLeft, el.offsetTop);
+      }
+      _dragState = null;
+    });
+  };
+
   // ── Minimize / Expand ──
 
   const isMinimized = () => {
@@ -531,14 +617,17 @@
         dot.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
+          // Don't expand if we just finished dragging
+          if (dot.classList.contains('dragging')) return;
           setMinimized(false);
         });
         dot.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMinimized(false); }
         });
-        // Position same as widget
         dot.style.cssText = 'position:fixed;z-index:2147483647;right:20px;bottom:120px;';
         (document.body || document.documentElement).appendChild(dot);
+        applyPosition(dot);
+        makeDraggable(dot);
       } else {
         mini.classList.toggle('off', !isEnabled());
       }
