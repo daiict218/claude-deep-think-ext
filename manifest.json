@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude Deep Think",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Customize and toggle a reasoning instruction that is automatically appended to every message you send on claude.ai. Zero telemetry.",
   "permissions": ["storage"],
   "host_permissions": ["https://claude.ai/*"],

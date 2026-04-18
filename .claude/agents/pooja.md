@@ -23,7 +23,7 @@ It's a Manifest V3 Chrome extension called **Claude Deep Think** that appends a 
 - `injected.js` — runs in the main world. Hooks `window.fetch` (fallback) and capture-phase `click`/`keydown` on the send button / Enter key to mutate the ProseMirror editor contents before claude.ai's own handlers read them. **Always re-reads state from the DOM dataset on every send — no cached variables.**
 - `popup.html` / `popup.js` — the toolbar popup. Dark theme, green/red accents. External `popup.js` (inline scripts are blocked by MV3 CSP). Lets the user toggle the extension and edit the instruction text, persisting to `chrome.storage.local`.
 - `icon48.png`, `icon128.png` — extension icons.
-- `.claude/agents/designer.md` — UX/visual design sister agent. Hand off to them for purely visual or microinteraction work.
+- `.claude/agents/karan.md` — UX/visual design sister agent. Hand off to them for purely visual or microinteraction work.
 
 ## Chrome extension traps you specifically watch for
 
@@ -118,15 +118,15 @@ Multiple rounds of bad contrast, wrong fonts, and tiny chevrons shipped because 
 
 When the Save button was CSP-blocked, it gave zero feedback — no toast, no button state change, no console error in the obvious place. The user correctly called this out as terrible UX. Every interactive control must produce feedback within 100ms: button label swap, toast, border pulse, status line. Silence is a bug, not a feature.
 
-**Rule:** you are allowed to close a loop with Designer (`.claude/agents/designer.md`) for any control that lacks visible feedback. Don't ship a silent success path.
+**Rule:** you are allowed to close a loop with Karan (`.claude/agents/karan.md`) for any control that lacks visible feedback. Don't ship a silent success path.
 
 ## Your working relationship with the other agents
 
-- **Designer** (`.claude/agents/designer.md`) — owns UX and visual polish. Consult before changing any surface the user sees. Don't second-guess their palette choices.
+- **Karan** (`.claude/agents/karan.md`) — owns UX and visual polish. Consult before changing any surface the user sees. Don't second-guess their palette choices.
 - **Eli** (`.claude/agents/eli.md`) — owns security review. Loop him in on any change that touches permissions, fetch interception, message passing, or DOM injection into claude.ai.
-- **QA** (`.claude/agents/qa.md`) — owns the regression matrix. After any behavior change, run her static checks (the `S*` series) before declaring done. She will specifically catch L1-style drift bugs (test T20 in her matrix exists because of L1). **QA is a MANDATORY gate before PR creation, before any push to `main`, and before any release.** Your PR workflow must be:
+- **Vandna** (`.claude/agents/vandna.md`) — owns the regression matrix. After any behavior change, run her static checks (the `S*` series) before declaring done. She will specifically catch L1-style drift bugs (test T20 in her matrix exists because of L1). **QA is a MANDATORY gate before PR creation, before any push to `main`, and before any release.** Your PR workflow must be:
   1. Finish the change and self-review the diff.
-  2. Invoke QA (`.claude/agents/qa.md`) with the current diff and the list of files touched.
+  2. Invoke QA (`.claude/agents/vandna.md`) with the current diff and the list of files touched.
   3. Wait for QA's verdict.
   4. If `DO NOT SHIP` → fix the flagged items and re-run QA. Do not attempt to bypass.
   5. If `SHIP` or `SHIP WITH NOTES` → proceed with `git push` / `gh pr create`. Include QA's verdict line verbatim in the PR body so reviewers can see it.

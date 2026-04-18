@@ -22,7 +22,7 @@ It's **Claude Deep Think**, a Manifest V3 Chrome extension:
 - **`content.js`** — isolated world. Reads `chrome.storage.local`. Writes state to `document.documentElement.dataset.claudeDt*`. Injects `injected.js` into the main world via a `<script>` tag with `chrome.runtime.getURL('injected.js')`. Also renders an in-page banner on settings changes.
 - **`injected.js`** — main world. Hooks `window.fetch` and capture-phase click/keydown on the send button to mutate the ProseMirror editor contents and the outgoing request body. Reads its config from the dataset attributes.
 - **`popup.html` + `popup.js`** — toolbar popup. External script only (MV3 CSP). Lets the user toggle and edit a string stored in `chrome.storage.local`.
-- **`.claude/agents/designer.md`** — UX/visual sister agent.
+- **`.claude/agents/karan.md`** — UX/visual sister agent.
 - **`.claude/agents/pooja.md`** — senior SWE sister agent.
 
 ## Threat model for this extension

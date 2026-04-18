@@ -11,5 +11,10 @@ node_modules/
 # Build output
 dist/
 
+# Screenshots (store assets, not source code)
+Screenshot*.png
+raw*.png
+store-screenshot*.png
+
 # Claude Code local overrides
 .claude/settings.local.json
