@@ -80,15 +80,16 @@
         flex-shrink: 0;
       }
       #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
-      #claude-dt-chip .cdt-minimize {
-        border: none; border-radius: 6px; border-left: 1px solid #333;
-        background: transparent; color: #888; cursor: pointer;
-        font: 600 10px/1 -apple-system, sans-serif;
-        padding: 10px 10px;
-        transition: .15s; white-space: nowrap;
-        letter-spacing: .3px;
+      #claude-dt-hide {
+        text-align: center; padding: 6px 0;
       }
-      #claude-dt-chip .cdt-minimize:hover { color: #fff; background: #2a2a50; }
+      #claude-dt-hide button {
+        background: none; border: none; color: #666;
+        font: 500 11px -apple-system, sans-serif; cursor: pointer;
+        padding: 4px 12px; border-radius: 6px;
+        transition: .15s; letter-spacing: .3px;
+      }
+      #claude-dt-hide button:hover { color: #ccc; background: #1e1e36; }
 
       /* ── Minimized state ── */
       #claude-dt-mini {
@@ -496,18 +497,7 @@
       const sw = document.createElement('span');
       sw.className = 'cdt-switch';
 
-      const minimizeBtn = document.createElement('button');
-      minimizeBtn.className = 'cdt-minimize';
-      minimizeBtn.type = 'button';
-      minimizeBtn.textContent = 'HIDE';
-      minimizeBtn.title = 'Minimize to a small dot';
-      minimizeBtn.setAttribute('aria-label', 'Minimize Deep Think chip');
-      minimizeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        setMinimized(true);
-      });
+      // Minimize button is created separately, outside the chip
 
       zoneToggle.append(onOff, sw);
       zoneToggle.addEventListener('click', (e) => {
@@ -526,7 +516,7 @@
         }
       });
 
-      chip.append(zoneProfile, zoneToggle, minimizeBtn);
+      chip.append(zoneProfile, zoneToggle);
       widget.appendChild(chip);
     }
 
@@ -535,6 +525,23 @@
       const desc = document.createElement('div');
       desc.id = 'claude-dt-desc';
       widget.appendChild(desc);
+    }
+
+    // Ensure HIDE bar exists inside widget
+    if (!document.getElementById('claude-dt-hide')) {
+      const hideBar = document.createElement('div');
+      hideBar.id = 'claude-dt-hide';
+      const hideBtn = document.createElement('button');
+      hideBtn.type = 'button';
+      hideBtn.textContent = 'Hide this bar';
+      hideBtn.setAttribute('aria-label', 'Minimize Deep Think to a small dot');
+      hideBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMinimized(true);
+      });
+      hideBar.appendChild(hideBtn);
+      widget.appendChild(hideBar);
     }
 
     updateChipVisual(chip);
@@ -578,7 +585,7 @@
     // Capture phase so it fires BEFORE any child's stopPropagation
     el.addEventListener('mousedown', (e) => {
       // Don't drag from buttons, inputs, or interactive children
-      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-minimize, .cdt-on-off')) return;
+      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-on-off')) return;
 
       // Convert right/bottom positioning to left/top before dragging
       const rect = el.getBoundingClientRect();
