@@ -53,7 +53,7 @@
       #claude-dt-widget {
         position: fixed; z-index: 2147483647;
         right: 20px; bottom: 120px;
-        max-width: 480px;
+        max-width: min(520px, calc(100vw - 40px));
       }
 
       /* ── Chip: two-zone layout ── */
@@ -77,8 +77,53 @@
         display: flex; align-items: center; gap: 8px;
         padding: 10px 14px; cursor: pointer;
         transition: background .12s;
+        flex-shrink: 0;
       }
       #claude-dt-chip .cdt-zone-toggle:hover { background: #1f1f3a; }
+      #claude-dt-hide {
+        text-align: center; padding: 6px 0;
+        background: #16162b;
+        border: 1px solid #333; border-top: none;
+        border-radius: 0 0 14px 14px;
+      }
+      #claude-dt-hide button {
+        background: none; border: none; color: #777;
+        font: 500 11px -apple-system, sans-serif; cursor: pointer;
+        padding: 4px 12px; border-radius: 6px;
+        transition: .15s; letter-spacing: .3px;
+      }
+      #claude-dt-hide button:hover { color: #ccc; background: #1e1e36; }
+
+      /* ── Minimized state ── */
+      #claude-dt-mini {
+        width: 38px; height: 38px; border-radius: 50%;
+        background: #16162b; border: 2px solid #4ade80;
+        color: #4ade80; cursor: pointer;
+        font: 700 12px/38px -apple-system, sans-serif;
+        text-align: center; user-select: none;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+        transition: transform .15s, background .15s;
+      }
+      #claude-dt-mini:hover { transform: scale(1.1); background: #1f1f3a; }
+      #claude-dt-mini.off { border-color: #e94560; color: #e94560; }
+      #claude-dt-widget.dragging, #claude-dt-mini.dragging {
+        opacity: 0.8; cursor: grabbing !important;
+      }
+      #claude-dt-widget { cursor: default; }
+      #claude-dt-chip .cdt-drag-handle {
+        display: flex; flex-direction: column; gap: 3px;
+        padding: 6px 2px; cursor: grab; flex-shrink: 0;
+        opacity: 0.4; transition: opacity .15s;
+      }
+      #claude-dt-chip .cdt-drag-handle:hover { opacity: 0.9; }
+      #claude-dt-chip .cdt-drag-handle:active { cursor: grabbing; }
+      #claude-dt-chip .cdt-drag-row {
+        display: flex; gap: 3px;
+      }
+      #claude-dt-chip .cdt-drag-dot {
+        width: 3px; height: 3px; border-radius: 50%;
+        background: #888;
+      }
       #claude-dt-chip .cdt-zone-toggle:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
       #claude-dt-chip .cdt-dot {
         width: 10px; height: 10px; border-radius: 50%;
@@ -86,7 +131,7 @@
       }
       #claude-dt-chip .cdt-profile-label {
         font-size: 14px; font-weight: 600; color: #fff;
-        max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+        max-width: 120px; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; line-height: 1.2;
       }
       #claude-dt-chip .cdt-circles {
@@ -117,15 +162,17 @@
       #claude-dt-chip .cdt-gear:hover { color: #fff; background: #2a2a50; }
 
       /* ── Description bar below chip ── */
-      #claude-dt-desc {
+      #claude-dt-dropdown {
         position: absolute;
         top: calc(100% - 1px);
         left: 0; right: 0;
+        display: flex; flex-direction: column;
+      }
+      #claude-dt-desc {
         padding: 8px 16px;
         background: #16162b;
         border: 1px solid #333;
         border-top: none;
-        border-radius: 0 0 14px 14px;
         font: 12px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         color: #ccc;
         text-align: left;
@@ -310,9 +357,10 @@
     const onOffEl = chip.querySelector('.cdt-on-off');
     if (onOffEl) onOffEl.textContent = on ? 'ON' : 'OFF';
 
-    // Update description bar — match chip width, show instruction preview
+    // Update dropdown (desc + hide bar)
+    const dropdown = document.getElementById('claude-dt-dropdown');
     const descEl = document.getElementById('claude-dt-desc');
-    if (descEl) {
+    if (descEl && dropdown) {
       if (active && on) {
         while (descEl.firstChild) descEl.firstChild.remove();
 
@@ -326,11 +374,13 @@
         text.textContent = instr.slice(0, 120) + (instr.length > 120 ? '...' : '');
 
         descEl.append(label, text);
-        descEl.classList.remove('hidden');
+        descEl.style.display = '';
+        dropdown.style.display = '';
         chip.style.borderRadius = '14px 14px 0 0';
       } else {
-        descEl.classList.add('hidden');
-        chip.style.borderRadius = '14px';
+        descEl.style.display = 'none';
+        dropdown.style.display = '';
+        chip.style.borderRadius = '14px 14px 0 0';
       }
     }
 
@@ -370,6 +420,8 @@
       widget = document.createElement('div');
       widget.id = 'claude-dt-widget';
       (document.body || document.documentElement).appendChild(widget);
+      applyPosition(widget);
+      makeDraggable(widget);
     }
 
     let chip = document.getElementById('claude-dt-chip');
@@ -411,10 +463,26 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePopover(); }
       });
 
-      zoneProfile.append(dot, profileLabel, circles, gear);
+      // Drag handle — 6 dots in a 3x2 grid
+      const dragHandle = document.createElement('span');
+      dragHandle.className = 'cdt-drag-handle';
+      dragHandle.title = 'Drag to reposition';
+      for (let r = 0; r < 3; r++) {
+        const row = document.createElement('span');
+        row.className = 'cdt-drag-row';
+        for (let c = 0; c < 2; c++) {
+          const d = document.createElement('span');
+          d.className = 'cdt-drag-dot';
+          row.appendChild(d);
+        }
+        dragHandle.appendChild(row);
+      }
+
+      zoneProfile.append(dragHandle, dot, profileLabel, circles, gear);
       zoneProfile.addEventListener('mousedown', (e) => e.stopPropagation());
       // Clicking the zone background (not a circle or gear) also opens popover
       zoneProfile.addEventListener('click', (e) => {
+        if (_justDragged) return;
         if (e.target === zoneProfile || e.target === dot || e.target === profileLabel) {
           e.preventDefault();
           e.stopPropagation();
@@ -437,6 +505,8 @@
       const sw = document.createElement('span');
       sw.className = 'cdt-switch';
 
+      // Minimize button is created separately, outside the chip
+
       zoneToggle.append(onOff, sw);
       zoneToggle.addEventListener('click', (e) => {
         e.preventDefault();
@@ -456,24 +526,201 @@
 
       chip.append(zoneProfile, zoneToggle);
       widget.appendChild(chip);
+      // Defer first visual update so DOM has rendered and profiles are loaded
+      requestAnimationFrame(() => updateChipVisual(chip));
     }
 
-    // Ensure description bar exists inside widget
-    if (!document.getElementById('claude-dt-desc')) {
+    // Ensure dropdown container (desc + hide) exists inside widget
+    if (!document.getElementById('claude-dt-dropdown')) {
+      const dropdown = document.createElement('div');
+      dropdown.id = 'claude-dt-dropdown';
+
       const desc = document.createElement('div');
       desc.id = 'claude-dt-desc';
-      widget.appendChild(desc);
+
+      const hideBar = document.createElement('div');
+      hideBar.id = 'claude-dt-hide';
+      const hideBtn = document.createElement('button');
+      hideBtn.type = 'button';
+      hideBtn.textContent = 'Hide this bar';
+      hideBtn.setAttribute('aria-label', 'Minimize Deep Think to a small dot');
+      hideBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMinimized(true);
+      });
+      hideBar.appendChild(hideBtn);
+
+      dropdown.append(desc, hideBar);
+      widget.appendChild(dropdown);
     }
 
     updateChipVisual(chip);
   };
 
-  setInterval(ensureChip, 2000);
+  // ── Drag ───────────────────────────────────────────────────────
+
+  const DRAG_THRESHOLD = 5;
+  let _dragState = null;
+  let _justDragged = false;
+
+  const getSavedPosition = () => {
+    try {
+      const raw = localStorage.getItem('claude-dt-position');
+      if (raw) {
+        const pos = JSON.parse(raw);
+        if (typeof pos.x === 'number' && typeof pos.y === 'number') return pos;
+      }
+    } catch {}
+    return null;
+  };
+
+  const savePosition = (x, y) => {
+    try { localStorage.setItem('claude-dt-position', JSON.stringify({ x, y })); } catch {}
+  };
+
+  const applyPosition = (el) => {
+    const pos = getSavedPosition();
+    if (pos) {
+      // Defer to next frame so element has dimensions
+      requestAnimationFrame(() => {
+        const w = el.offsetWidth || 200;
+        const h = el.offsetHeight || 50;
+        const maxX = Math.max(0, window.innerWidth - w);
+        const maxY = Math.max(0, window.innerHeight - h);
+        el.style.left = Math.max(0, Math.min(pos.x, maxX)) + 'px';
+        el.style.top = Math.max(0, Math.min(pos.y, maxY)) + 'px';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+      });
+    }
+  };
+
+  const makeDraggable = (el) => {
+    // Capture phase so it fires BEFORE any child's stopPropagation
+    el.addEventListener('mousedown', (e) => {
+      // Don't drag from buttons, inputs, or interactive children
+      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-on-off')) return;
+
+      // Convert right/bottom positioning to left/top before dragging
+      const rect = el.getBoundingClientRect();
+      _dragState = {
+        el,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: rect.left,
+        origTop: rect.top,
+        dragging: false,
+      };
+    }, true);
+
+    document.addEventListener('mousemove', (e) => {
+      if (!_dragState || _dragState.el !== el) return;
+      const dx = e.clientX - _dragState.startX;
+      const dy = e.clientY - _dragState.startY;
+
+      if (!_dragState.dragging) {
+        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+        _dragState.dragging = true;
+        el.classList.add('dragging');
+      }
+
+      e.preventDefault();
+      const w = el.offsetWidth || 200;
+      const h = el.offsetHeight || 50;
+      const newX = Math.max(0, Math.min(_dragState.origLeft + dx, window.innerWidth - w));
+      const newY = Math.max(0, Math.min(_dragState.origTop + dy, window.innerHeight - h));
+      el.style.left = newX + 'px';
+      el.style.top = newY + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!_dragState || _dragState.el !== el) return;
+      const wasDragging = _dragState.dragging;
+      el.classList.remove('dragging');
+      if (wasDragging) {
+        savePosition(el.offsetLeft, el.offsetTop);
+        _justDragged = true;
+        setTimeout(() => { _justDragged = false; }, 200);
+      }
+      _dragState = null;
+    });
+  };
+
+  // ── Minimize / Expand ──
+
+  const isMinimized = () => {
+    try { return localStorage.getItem('claude-dt-minimized') === '1'; } catch { return false; }
+  };
+
+  const setMinimized = (val) => {
+    try { localStorage.setItem('claude-dt-minimized', val ? '1' : '0'); } catch {}
+    applyMinimizedState();
+  };
+
+  const applyMinimizedState = () => {
+    const widget = document.getElementById('claude-dt-widget');
+    const mini = document.getElementById('claude-dt-mini');
+
+    if (isMinimized()) {
+      if (widget) widget.style.display = 'none';
+      if (!mini) {
+        const dot = document.createElement('div');
+        dot.id = 'claude-dt-mini';
+        dot.textContent = 'DT';
+        dot.title = 'Expand Deep Think';
+        dot.setAttribute('role', 'button');
+        dot.setAttribute('aria-label', 'Expand Deep Think chip');
+        dot.tabIndex = 0;
+        dot.classList.toggle('off', !isEnabled());
+        dot.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (_justDragged) return;
+          setMinimized(false);
+        });
+        dot.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMinimized(false); }
+        });
+        dot.style.cssText = 'position:fixed;z-index:2147483647;right:20px;bottom:120px;';
+        (document.body || document.documentElement).appendChild(dot);
+        applyPosition(dot);
+        makeDraggable(dot);
+      } else {
+        mini.classList.toggle('off', !isEnabled());
+      }
+    } else {
+      if (mini) mini.remove();
+      if (widget) widget.style.display = '';
+      ensureChip();
+    }
+  };
+
+  setInterval(() => {
+    injectStyles();
+    if (isMinimized()) applyMinimizedState();
+    else ensureChip();
+  }, 2000);
   const bootChip = () => {
-    if (document.body) ensureChip();
+    if (document.body) { injectStyles(); applyMinimizedState(); if (!isMinimized()) ensureChip(); }
     else setTimeout(bootChip, 100);
   };
   bootChip();
+
+  // Re-clamp to viewport on resize
+  window.addEventListener('resize', () => {
+    const el = document.getElementById('claude-dt-widget') || document.getElementById('claude-dt-mini');
+    if (el && el.style.left && el.style.left !== 'auto') {
+      const w = el.offsetWidth || 200;
+      const h = el.offsetHeight || 50;
+      const x = Math.max(0, Math.min(el.offsetLeft, window.innerWidth - w));
+      const y = Math.max(0, Math.min(el.offsetTop, window.innerHeight - h));
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+    }
+  });
 
   // Hotkey: Cmd/Ctrl+Shift+D
   document.addEventListener('keydown', (e) => {
