@@ -104,8 +104,20 @@
         opacity: 0.8; cursor: grabbing !important;
       }
       #claude-dt-widget { cursor: default; }
-      #claude-dt-chip .cdt-zone-profile { cursor: grab; }
-      #claude-dt-chip .cdt-zone-profile:active { cursor: grabbing; }
+      #claude-dt-chip .cdt-drag-handle {
+        display: flex; flex-direction: column; gap: 3px;
+        padding: 6px 2px; cursor: grab; flex-shrink: 0;
+        opacity: 0.4; transition: opacity .15s;
+      }
+      #claude-dt-chip .cdt-drag-handle:hover { opacity: 0.9; }
+      #claude-dt-chip .cdt-drag-handle:active { cursor: grabbing; }
+      #claude-dt-chip .cdt-drag-row {
+        display: flex; gap: 3px;
+      }
+      #claude-dt-chip .cdt-drag-dot {
+        width: 3px; height: 3px; border-radius: 50%;
+        background: #888;
+      }
       #claude-dt-chip .cdt-zone-toggle:focus-visible { outline: 2px solid #4ade80; outline-offset: -2px; }
       #claude-dt-chip .cdt-dot {
         width: 10px; height: 10px; border-radius: 50%;
@@ -440,12 +452,26 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePopover(); }
       });
 
-      zoneProfile.append(dot, profileLabel, circles, gear);
+      // Drag handle — 6 dots in a 3x2 grid
+      const dragHandle = document.createElement('span');
+      dragHandle.className = 'cdt-drag-handle';
+      dragHandle.title = 'Drag to reposition';
+      for (let r = 0; r < 3; r++) {
+        const row = document.createElement('span');
+        row.className = 'cdt-drag-row';
+        for (let c = 0; c < 2; c++) {
+          const d = document.createElement('span');
+          d.className = 'cdt-drag-dot';
+          row.appendChild(d);
+        }
+        dragHandle.appendChild(row);
+      }
+
+      zoneProfile.append(dragHandle, dot, profileLabel, circles, gear);
       zoneProfile.addEventListener('mousedown', (e) => e.stopPropagation());
       // Clicking the zone background (not a circle or gear) also opens popover
       zoneProfile.addEventListener('click', (e) => {
-        // Don't open popover if we just finished dragging
-        if (_dragState?.dragging) return;
+        if (_justDragged) return;
         if (e.target === zoneProfile || e.target === dot || e.target === profileLabel) {
           e.preventDefault();
           e.stopPropagation();
@@ -516,6 +542,7 @@
 
   const DRAG_THRESHOLD = 5;
   let _dragState = null;
+  let _justDragged = false;
 
   const getSavedPosition = () => {
     try {
@@ -549,7 +576,7 @@
     // Capture phase so it fires BEFORE any child's stopPropagation
     el.addEventListener('mousedown', (e) => {
       // Don't drag from buttons, inputs, or interactive children
-      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-minimize')) return;
+      if (e.target.closest('button, input, textarea, .cdt-circle, .cdt-gear, .cdt-switch, .cdt-minimize, .cdt-on-off')) return;
 
       // Convert right/bottom positioning to left/top before dragging
       const rect = el.getBoundingClientRect();
@@ -589,6 +616,8 @@
       el.classList.remove('dragging');
       if (wasDragging) {
         savePosition(el.offsetLeft, el.offsetTop);
+        _justDragged = true;
+        setTimeout(() => { _justDragged = false; }, 200);
       }
       _dragState = null;
     });
@@ -623,8 +652,7 @@
         dot.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          // Don't expand if we just finished dragging
-          if (dot.classList.contains('dragging')) return;
+          if (_justDragged) return;
           setMinimized(false);
         });
         dot.addEventListener('keydown', (e) => {
